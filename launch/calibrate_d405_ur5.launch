@@ -1,8 +1,8 @@
 <launch>
     <arg name="namespace_prefix" default="ur5_d405_handeyecalibration" />
 
-    <arg name="marker_size" default="0.045" doc="Size of the ArUco marker used, in meters" />
-    <arg name="marker_id" default="215" doc="The ID of the ArUco marker used" />
+    <arg name="marker_size" default="0.162" doc="Size of the ArUco marker used, in meters" />
+    <arg name="marker_id" default="69" doc="The ID of the ArUco marker used" />
 
     <!-- start the d405 -->
     <include file="$(find slip_manipulation)/launch/setup_d405.launch" />

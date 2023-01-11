@@ -1,0 +1,18 @@
+parameters:
+  eye_on_hand: true
+  freehand_robot_movement: false
+  move_group: manipulator
+  move_group_namespace: /
+  namespace: /ur5_d405_handeyecalibration_eye_on_hand/
+  robot_base_frame: base_link
+  robot_effector_frame: wrist_3_link
+  tracking_base_frame: camera_link
+  tracking_marker_frame: camera_marker
+transformation:
+  qw: 0.6255324347025005
+  qx: -0.3474611905226109
+  qy: -0.33956448652341975
+  qz: -0.6104718287585909
+  x: 0.006085628243139828
+  y: 0.09142734659356874
+  z: 0.0631901508162768
