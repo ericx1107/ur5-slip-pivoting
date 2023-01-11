@@ -71,7 +71,6 @@ class UR5Moveit():
         raw_input('Check Rviz for plan, press enter to execute')
 
         self.arm.execute(plan)
-        pass
 
 
 if __name__ == "__main__":
