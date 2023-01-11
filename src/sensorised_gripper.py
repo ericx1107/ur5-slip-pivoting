@@ -1,16 +1,11 @@
 #! /usr/bin/env python
 
 import rospy
-import numpy as np
-from time import sleep
-from std_msgs.msg import String
+
 import roslib; roslib.load_manifest('robotiq_2f_gripper_control')
 from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_output  as outputMsg
 from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_input  as inputMsg
 from robotiq_ft_sensor.msg import ft_sensor
-from geometry_msgs.msg import PoseStamped
-from sensor_msgs.msg import PointCloud2
-from moveit_msgs.msg import Constraints, JointConstraint
 from papillarray_ros_v2.msg import SensorState
 import csv
 
@@ -165,11 +160,5 @@ class SensorisedGripper():
             writer.writerows(self.tac1_data_arr)
 
 if __name__ == "__main__":
-    gripper = SensorisedGripper()
-    # touch = False
-    # while not touch:
-    #     touch = gripper.touch_obj()
-    while not rospy.is_shutdown():
-        gripper.manual_grip()
-        gripper.save_data()
+    pass
     
