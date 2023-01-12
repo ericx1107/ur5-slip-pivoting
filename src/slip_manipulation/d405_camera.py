@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 import rospy
 import numpy as np
 import open3d as o3d
@@ -69,7 +71,7 @@ class D405Camera():
             pcd = pcd.select_by_index(inliers, invert=True)       # rest of the objects
 
             # print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
-            print(f"Removed plane with {plane_size} points")
+            # print(f"Removed plane with {plane_size} points")
         
         # Clean up point cloud
         # pcd, ind = pcd.remove_radius_outlier(nb_points=500, radius=0.04)
@@ -81,4 +83,4 @@ class D405Camera():
         self.point_cloud_publisher.publish(pcd_msg)
         print("Publishing objects point cloud...")
 
-        print(f"Time taken: {time.time() - start_time}")
+        # print(f"Time taken: {time.time() - start_time}")
