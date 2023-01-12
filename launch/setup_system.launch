@@ -1,0 +1,6 @@
+<launch>
+    <include file="$(find slip_manipulation)/launch/setup_d405.launch" />
+    <include file="$(find slip_manipulation)/launch/setup_ur5.launch" />
+    <include file="$(find slip_manipulation)/launch/publish_camera_tf.launch" />
+    <include file="$(find aruco_ros)/launch/marker_publisher.launch" />
+</launch>
