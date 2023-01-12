@@ -12,10 +12,10 @@ from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import PointCloud2
 from moveit_msgs.msg import Constraints, JointConstraint
 from slip_manipulation.ur5_moveit import UR5Moveit
-from retrieve_aruco_pose import Markers
+from slip_manipulation.box_markers import BoxMarkers
 
 ur5 = UR5Moveit()
-markers = Markers()
+markers = BoxMarkers()
 rospy.sleep(2)
 
 ur5.arm.set_pose_reference_frame('base_link')
