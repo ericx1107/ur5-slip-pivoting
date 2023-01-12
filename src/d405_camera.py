@@ -9,7 +9,7 @@ from sensor_msgs.msg import PointCloud2
 class D405Camera():
     def __init__(self):
         self.original_pcd_topic = '/camera/depth/color/points'
-        self.seg_pcd_topic = self.original_pcd_topic + '_segmented'
+        self.seg_pcd_topic = self.original_pcd_topic + '_processed'
 
         self.point_cloud_listener = rospy.Subscriber(
             self.original_pcd_topic,
