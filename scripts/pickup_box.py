@@ -11,6 +11,7 @@ from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_output  as ou
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import PointCloud2
 from moveit_msgs.msg import Constraints, JointConstraint
+from slip_manipulation.src.d405_camera import D405Camera
 
 class PickUp():
     

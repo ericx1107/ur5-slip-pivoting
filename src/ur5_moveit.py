@@ -6,6 +6,10 @@ import numpy as np
 import roslib; roslib.load_manifest('robotiq_2f_gripper_control')
 from geometry_msgs.msg import PoseStamped
 from moveit_msgs.msg import Constraints, JointConstraint
+from geometry_msgs.msg import Pose
+
+import tf2_ros
+import tf2_geometry_msgs
 
 class UR5Moveit():
     
@@ -35,7 +39,7 @@ class UR5Moveit():
         }
 
         # move to start pose
-        self.move_to_joints_pose(self.start_pose)
+        # self.move_to_joints_pose(self.start_pose)
 
     def init_planning_scene(self):
         # add table collision object
@@ -72,6 +76,23 @@ class UR5Moveit():
 
         self.arm.execute(plan)
 
+    def tf_transform_pose(self, input_pose, from_frame, to_frame):
+        tf_buffer = tf2_ros.Buffer()
+        listener = tf2_ros.TransformListener(tf_buffer)
+
+        # make PoseStamped message from Pose input
+        pose_stamped = tf2_geometry_msgs.PoseStamped()
+        pose_stamped.pose = input_pose
+        pose_stamped.header.frame_id = from_frame
+        pose_stamped.header.stamp = rospy.Time.now()
+
+        try:
+            # ** It is important to wait for the listener to start listening. Hence the rospy.Duration(1)
+            output_pose_stamped = tf_buffer.transform(pose_stamped, to_frame, rospy.Duration(1), PoseStamped)
+            return output_pose_stamped.pose
+
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            raise
 
 if __name__ == "__main__":
     pass

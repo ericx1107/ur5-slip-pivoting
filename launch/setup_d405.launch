@@ -4,6 +4,8 @@
         <arg name="filters" value="pointcloud" />
     </include>
 
+    <include file="$(find slip_manipulation)/launch/publish_d405_tf.launch" />
+
       <arg name="debug" default="false" />
     <arg unless="$(arg debug)" name="launch_prefix" value="" />
     <arg     if="$(arg debug)" name="launch_prefix" value="gdb --ex run --args" />
