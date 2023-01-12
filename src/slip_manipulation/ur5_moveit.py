@@ -6,7 +6,6 @@ import numpy as np
 import roslib; roslib.load_manifest('robotiq_2f_gripper_control')
 from geometry_msgs.msg import PoseStamped
 from moveit_msgs.msg import Constraints, JointConstraint
-from geometry_msgs.msg import Pose
 
 import tf2_ros
 import tf2_geometry_msgs
@@ -19,7 +18,7 @@ class UR5Moveit():
         self.scene = moveit_commander.PlanningSceneInterface(synchronous=True)
         self.table_size = [2, 2, 0.87]
 
-        self.pose_publisher = rospy.Publisher('display_pose', Pose, queue_size=1)
+        self.pose_publisher = rospy.Publisher('display_pose', PoseStamped, queue_size=1)
 
         self.arm = moveit_commander.MoveGroupCommander('manipulator')
         # self.arm.set_planner_id("") # /home/acrv/HRIGroupAdmin/example_ros_ws/src/universal_robot/ur5_moveit_config/config/ompl_planning.yaml
@@ -87,13 +86,13 @@ class UR5Moveit():
         pose_stamped = tf2_geometry_msgs.PoseStamped()
         pose_stamped.pose = input_pose
         pose_stamped.header.frame_id = from_frame
-        pose_stamped.header.stamp = rospy.Time.now()
+        pose_stamped.header.stamp = rospy.Time(0)
 
         try:
             # ** It is important to wait for the listener to start listening. Hence the rospy.Duration(1)
-            output_pose_stamped = tf_buffer.transform(pose_stamped, to_frame, rospy.Duration(1), PoseStamped)
+            output_pose_stamped = tf_buffer.transform(pose_stamped, to_frame, rospy.Duration(2), PoseStamped)
             # tf_buffer.transform is incorrectly documented as giving no returns. The return below is mistaken by vs code as unreachable
-            return output_pose_stamped.pose
+            return output_pose_stamped
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
             raise
