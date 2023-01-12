@@ -19,6 +19,8 @@ class UR5Moveit():
         self.scene = moveit_commander.PlanningSceneInterface(synchronous=True)
         self.table_size = [2, 2, 0.87]
 
+        self.pose_publisher = rospy.Publisher('display_pose', Pose, queue_size=1)
+
         self.arm = moveit_commander.MoveGroupCommander('manipulator')
         # self.arm.set_planner_id("") # /home/acrv/HRIGroupAdmin/example_ros_ws/src/universal_robot/ur5_moveit_config/config/ompl_planning.yaml
 
@@ -76,7 +78,8 @@ class UR5Moveit():
 
         self.arm.execute(plan)
 
-    def tf_transform_pose(self, input_pose, from_frame, to_frame):
+    @staticmethod
+    def tf_transform_pose(input_pose, from_frame, to_frame):
         tf_buffer = tf2_ros.Buffer()
         listener = tf2_ros.TransformListener(tf_buffer)
 
@@ -89,10 +92,14 @@ class UR5Moveit():
         try:
             # ** It is important to wait for the listener to start listening. Hence the rospy.Duration(1)
             output_pose_stamped = tf_buffer.transform(pose_stamped, to_frame, rospy.Duration(1), PoseStamped)
+            # tf_buffer.transform is incorrectly documented as giving no returns. The return below is mistaken by vs code as unreachable
             return output_pose_stamped.pose
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
             raise
+
+    def display_pose(self, pose):
+        self.pose_publisher.publish(pose)
 
 if __name__ == "__main__":
     pass
