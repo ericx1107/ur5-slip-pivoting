@@ -14,25 +14,37 @@ from moveit_msgs.msg import Constraints, JointConstraint
 from slip_manipulation.ur5_moveit import UR5Moveit
 from slip_manipulation.box_markers import BoxMarkers
 
+rospy.init_node('test_node')
+
 ur5 = UR5Moveit()
+# rospy.sleep(2)
+# plan, _ = ur5.plan_cartesian_path(r = 0.09)
+# raw_input("Enter to execute")
+# ur5.arm.execute(plan)
+
 markers = BoxMarkers()
-rospy.sleep(2)
 
-ur5.arm.set_pose_reference_frame('base_link')
+# while not rospy.is_shutdown():
+#     markers.publish_box()
+# rospy.sleep(2)
+rospy.spin()
 
-input_pose = markers.marker_list["1"]["pose"]
-print(type(input_pose))
-output_pose_stamped = ur5.tf_transform_pose(input_pose, 'camera_link', 'base_link')
+# ur5.arm.set_pose_reference_frame('base_link')
+
+# input_pose = markers.marker_list["1"]["pose"]
+# print(type(input_pose))
+# output_pose_stamped = ur5.tf_transform_pose(input_pose, 'camera_link', 'base_link')
 
 
-while not rospy.is_shutdown():
-    ur5.display_pose(output_pose_stamped)
+# while not rospy.is_shutdown():
+#     ur5.display_pose(output_pose_stamped)
 
 
 
 '''ee_link = ur5.arm.get_end_effector_link()
 start_pose = ur5.arm.get_current_pose(ee_link).pose
 print(start_pose)
+ur5 = UR5Moveit()
 # goal_pose = [-0.150002384447, 0.0959219176177, 0.74666077793, 
 # 0.658653290385, -0.611800540121, -0.269746822291, 0.345126924532]
 # ur5.arm.set_pose_target(goal_pose)
