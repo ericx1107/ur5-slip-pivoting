@@ -4,11 +4,8 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /MotionPlanning1
         - /MotionPlanning1/Planned Path1
-        - /TF1
         - /TF1/Frames1
-        - /PointCloud21
       Splitter Ratio: 0.5175438523292542
     Tree Height: 246
   - Class: rviz/Help
@@ -229,73 +226,19 @@ Visualization Manager:
       Value: true
       Velocity_Scaling_Factor: 0.3
     - Class: rviz/TF
-      Enabled: true
+      Enabled: false
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        base:
-          Value: false
-        base_link:
-          Value: true
-        base_link_inertia:
-          Value: false
-        camera_color_frame:
-          Value: false
-        camera_color_optical_frame:
-          Value: false
-        camera_depth_frame:
-          Value: false
-        camera_depth_optical_frame:
-          Value: false
-        camera_link:
-          Value: true
-        flange:
-          Value: false
-        forearm_link:
-          Value: false
-        shoulder_link:
-          Value: false
-        tool0:
-          Value: false
-        tool0_controller:
-          Value: false
-        upper_arm_link:
-          Value: false
-        wrist_1_link:
-          Value: false
-        wrist_2_link:
-          Value: false
-        wrist_3_link:
-          Value: true
       Marker Scale: 1
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        base_link:
-          base:
-            tool0_controller:
-              {}
-          base_link_inertia:
-            shoulder_link:
-              upper_arm_link:
-                forearm_link:
-                  wrist_1_link:
-                    wrist_2_link:
-                      wrist_3_link:
-                        camera_link:
-                          camera_color_frame:
-                            camera_color_optical_frame:
-                              {}
-                          camera_depth_frame:
-                            camera_depth_optical_frame:
-                              {}
-                        flange:
-                          tool0:
-                            {}
+        {}
       Update Interval: 0
-      Value: true
+      Value: false
     - Class: rviz/Image
       Enabled: true
       Image Topic: /aruco_marker_publisher/result
@@ -336,6 +279,59 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: /slip_manipulation/box_visualisation
+      Name: Marker
+      Namespaces:
+        box: true
+      Queue Size: 100
+      Value: true
+    - Alpha: 1
+      Axes Length: 0.10000000149011612
+      Axes Radius: 0.009999999776482582
+      Class: rviz/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Pose
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Axes
+      Topic: /slip_manipulation/centre_grasp
+      Unreliable: false
+      Value: true
+    - Alpha: 1
+      Axes Length: 0.10000000149011612
+      Axes Radius: 0.009999999776482582
+      Class: rviz/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Pose
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Axes
+      Topic: /slip_manipulation/pos_grasp
+      Unreliable: false
+      Value: true
+    - Alpha: 1
+      Axes Length: 0.10000000149011612
+      Axes Radius: 0.009999999776482582
+      Class: rviz/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Pose
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Axes
+      Topic: /slip_manipulation/neg_grasp
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -352,25 +348,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/XYOrbit
-      Distance: 1.1297105550765991
+      Distance: 0.8860790729522705
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.3273555040359497
-        Y: -0.05859333276748657
+        X: -0.6082078218460083
+        Y: 0.09127962589263916
         Z: -6.705516852889559e-7
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4747954308986664
+      Pitch: 0.6397942304611206
       Target Frame: base_link
       Value: XYOrbit (rviz)
-      Yaw: 4.399952411651611
+      Yaw: 4.259965896606445
     Saved: ~
 Window Geometry:
   Displays:

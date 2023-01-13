@@ -1,6 +1,7 @@
 <launch>
     <include file="$(find slip_manipulation)/launch/setup_d405.launch" />
     <include file="$(find slip_manipulation)/launch/setup_ur5.launch" />
+    <include file="$(find slip_manipulation)/launch/setup_gripper.launch" />
     <include file="$(find slip_manipulation)/launch/publish_d405_tf.launch" />
     <include file="$(find slip_manipulation)/launch/marker_publisher.launch" />
 </launch>

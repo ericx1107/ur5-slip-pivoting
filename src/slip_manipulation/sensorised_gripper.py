@@ -11,8 +11,6 @@ import csv
 
 class SensorisedGripper():
     def __init__(self):
-        rospy.init_node('tactile_data')
-
         # set up gripper subscriber and publisher
         self.gripper_sub = rospy.Subscriber('/Robotiq2FGripperRobotInput', 
             inputMsg.Robotiq2FGripper_robot_input, self.gripper_callback)
@@ -42,8 +40,10 @@ class SensorisedGripper():
         rospy.sleep(1)
 
     def send_gripper_command(self, commandName="deactivate", grip_width=None):
-        # 'commands' Starts with all zeros, but lets be careful in case of future changes
-        # shitty implementation of manual setting of grip width, feed None into commandName to use
+        '''
+        'commands' Starts with all zeros, but lets be careful in case of future changes
+        shitty implementation of manual setting of grip width, feed None into commandName to use
+        '''
         command = outputMsg.Robotiq2FGripper_robot_output()
         if (grip_width is not None) and (255 >= grip_width >= 0):
             command.rACT = 1
@@ -125,7 +125,7 @@ class SensorisedGripper():
         # wait for gripper to move
         rospy.sleep(1)
 
-    def touch_obj(self):
+    def touch_object(self):
         # slowly tighten gripper until tactile sensors report contact
 
         both_contact = self.tac0_data.is_contact and self.tac1_data.is_contact

@@ -25,7 +25,9 @@ class UR5Moveit():
         self.pose_publisher = rospy.Publisher('display_pose', PoseStamped, queue_size=1)
 
         self.arm = moveit_commander.MoveGroupCommander('manipulator')
-        # self.arm.set_planner_id("") # /home/acrv/HRIGroupAdmin/example_ros_ws/src/universal_robot/ur5_moveit_config/config/ompl_planning.yaml
+        self.arm.set_planner_id("RRTstar") # /home/acrv/HRIGroupAdmin/example_ros_ws/src/universal_robot/ur5_moveit_config/config/ompl_planning.yaml
+
+        # print(moveit_commander.RobotCommander().get_link_names())
 
         self.init_planning_scene()
 
@@ -72,12 +74,30 @@ class UR5Moveit():
         self.arm.set_path_constraints(self.camera_constraints)
         
 
-    def move_to_joints_pose(self, goal_pose):
+    def move_to_joints_goal(self, goal_pose):
         self.arm.set_joint_value_target(goal_pose)
 
         plan = self.arm.plan()
 
-        raw_input('Check Rviz for plan, press enter to execute')
+        raw_input('Check Rviz for joints plan, press enter to execute')
+
+        self.arm.execute(plan)
+
+    def move_to_ee_goal(self, goal_pose):
+        self.arm.set_pose_target(goal_pose)
+        
+        plan = self.arm.plan()
+        
+        raw_input('Check Rviz for ee plan, press enter to execute')
+
+        self.arm.execute(plan)
+        
+    def move_to_cartesian_goal(self, goal_pose):
+        plan, _ = self.arm.compute_cartesian_path([goal_pose], # waypoints to follow
+										        0.01,       # eef_step  
+										        0.0)        # jump_threshold  
+        
+        raw_input('Check Rviz for cartesian plan, press enter to execute')
 
         self.arm.execute(plan)
 

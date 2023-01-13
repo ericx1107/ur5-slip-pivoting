@@ -1,6 +1,8 @@
 <launch>
 
-    <node name="Robotiq2FGripperRtuNode" pkg="robotiq_f_gripper_control" type="Robotiq2FGripperRtuNode.py" respawn="true" args="/dev/ttyUSB1" />
-    <node name="Robotiq2FGripperSimpleController" pkg="robotiq_f_gripper_control" type="Robotiq2FGripperSimpleController.py" respawn="true" />
+    <node name="Robotiq2FGripperRtuNode" pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperRtuNode.py" respawn="true" args="/dev/ttyUSB0" />
+    <!-- <node name="Robotiq2FGripperSimpleController" pkg="robotiq_2f_gripper_control" type="Robotiq2FGripperSimpleController.py" respawn="true" /> -->
+
+    <node pkg="tf" type="static_transform_publisher" name="gripper_ee_tf" args="0 0 0.15 0 0 0 /tool0 /gripper_ee 100"/>
 
 </launch>

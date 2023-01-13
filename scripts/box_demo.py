@@ -4,6 +4,7 @@ import rospy
 import moveit_commander
 import numpy as np
 import open3d
+import copy
 from time import sleep
 from std_msgs.msg import String
 import roslib; roslib.load_manifest('robotiq_2f_gripper_control')
@@ -13,21 +14,54 @@ from sensor_msgs.msg import PointCloud2
 from moveit_msgs.msg import Constraints, JointConstraint
 from slip_manipulation.ur5_moveit import UR5Moveit
 from slip_manipulation.box_markers import BoxMarkers
+from slip_manipulation.sensorised_gripper import SensorisedGripper
 
-rospy.init_node('test_node')
+class BoxDemo():
+    def __init__(self):
+        self.ur5 = UR5Moveit()
+        self.markers = BoxMarkers()
+        self.gripper = SensorisedGripper()
 
-ur5 = UR5Moveit()
-# rospy.sleep(2)
-# plan, _ = ur5.plan_cartesian_path(r = 0.09)
-# raw_input("Enter to execute")
-# ur5.arm.execute(plan)
+        self.pos_grasp_sub = rospy.Subscriber('/slip_manipulation/pos_grasp', PoseStamped, self.callback)
+        self.grasp_pub = rospy.Publisher('test_grasp', PoseStamped, queue_size=1)
 
-markers = BoxMarkers()
+        self.pregrasp_offset = 0.05
+        
+        self.ee_offset = 0.15
 
-# while not rospy.is_shutdown():
-#     markers.publish_box()
-# rospy.sleep(2)
-rospy.spin()
+        self.grasp_goal = PoseStamped()
+
+    def callback(self, data):
+        self.grasp_goal = data
+        self.grasp_goal.pose.position.z += self.ee_offset
+
+
+if __name__ == "__main__":
+    rospy.init_node('box_demo')
+
+    demo = BoxDemo()
+    rospy.sleep(10)
+    
+    # move to goal
+    pregrasp_pose = copy.deepcopy(demo.grasp_goal)
+    pregrasp_pose.pose.position.z += demo.pregrasp_offset
+    
+    print("planning")
+    demo.grasp_pub.publish(pregrasp_pose)
+    
+    # demo.markers.shutdown_detector()
+    
+    # demo.ur5.move_to_ee_goal(pregrasp_pose)
+    demo.ur5.move_to_cartesian_goal(pregrasp_pose.pose)
+    
+    demo.ur5.move_to_cartesian_goal(demo.grasp_goal.pose)
+
+    # close gripper
+    raw_input("press enter to close gripper")
+    demo.gripper.send_gripper_command(commandName=None, grip_width=116)
+
+
+
 
 # ur5.arm.set_pose_reference_frame('base_link')
 

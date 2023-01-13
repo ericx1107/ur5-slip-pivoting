@@ -4,11 +4,12 @@ import rospy
 import tf2_ros
 import tf_conversions
 import numpy as np
+import copy
 from aruco_msgs.msg import MarkerArray
 from collections import defaultdict
-from geometry_msgs.msg import Pose, PoseStamped, TransformStamped
+from geometry_msgs.msg import Pose, PoseStamped, TransformStamped, Quaternion
 from visualization_msgs.msg import Marker
-from std_msgs.msg import Time
+from std_msgs.msg import Header
 from slip_manipulation.get_tf_helper import *
 
 class BoxMarkers():
@@ -17,9 +18,13 @@ class BoxMarkers():
         self.markers_sub = rospy.Subscriber('/aruco_marker_publisher/markers', 
             MarkerArray, self.marker_callback)
 
-        self.markers_pose_pub = rospy.Publisher('marker_pose', PoseStamped, queue_size=1)
+        self.markers_pose_pub = rospy.Publisher('/slip_manipulation/marker_pose', PoseStamped, queue_size=1)
         
-        self.visualise_box_pub = rospy.Publisher('box_visualisation', Marker, queue_size=1)
+        self.visualise_box_pub = rospy.Publisher('/slip_manipulation/box_visualisation', Marker, queue_size=1)
+        
+        self.centre_grasp_pub = rospy.Publisher('/slip_manipulation/centre_grasp', PoseStamped, queue_size=1)
+        self.pos_grasp_pub = rospy.Publisher('/slip_manipulation/pos_grasp', PoseStamped, queue_size=1)
+        self.neg_grasp_pub = rospy.Publisher('/slip_manipulation/neg_grasp', PoseStamped, queue_size=1)
 
         # self.marker_list = defaultdict(lambda: {"pose": 0})
 
@@ -51,6 +56,10 @@ class BoxMarkers():
             self.publish_box_origin_transform(marker.id)
         
             self.publish_box()
+            
+            self.generate_grasp_pose()
+        
+        self.shutdown_detector() # only detect once
 
     def publish_marker_transform(self, pose_stamped, marker_id):
         t = TransformStamped()
@@ -71,7 +80,7 @@ class BoxMarkers():
     def publish_box_origin_transform(self, marker_id):
         if marker_id == 3:
             z_offset = -self.box_dim[1]/2
-            rot_rpy = (0, 0, 0)
+            rot_rpy = (0, 0, 0)             # TODO: match all axes of box_origin frame after converting
         elif marker_id == 4:
             z_offset = -self.box_dim[1]/2
             rot_rpy = (0, 0, np.pi/2)
@@ -119,8 +128,6 @@ class BoxMarkers():
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
             print("Can't see box!\n")
             return
-        # hardcoded encoding from marker coordinate frame to box dimensions
-        
         
         mkr = Marker()
         mkr.header = box_from_base_stamped.header
@@ -138,8 +145,95 @@ class BoxMarkers():
         mkr.color.b = 1.0
     
         self.box_pose = box_from_base_stamped.pose
+        # print(self.box_pose)
+        # print_rpy = tf_conversions.transformations.euler_from_quaternion([self.box_pose.orientation.x, 
+                                                                            # self.box_pose.orientation.y, 
+                                                                            # self.box_pose.orientation.z, 
+                                                                            # self.box_pose.orientation.w])
+        # print('ori: ', np.array(print_rpy)*180/np.pi)
     
         self.visualise_box_pub.publish(mkr)
     
+    def generate_grasp_pose(self):
+        # assuming that at the beginning the box is upright
+        finger_offset = 0.02
+        
+        # check upright edge using transform from base_link
+        trans = self.tf_buffer.lookup_transform('box_origin', 'base_link', rospy.Time(0), timeout=rospy.Duration(2))
+        orientation_rpy = np.array(tf_conversions.transformations.euler_from_quaternion([trans.transform.rotation.x, 
+                                                                                        trans.transform.rotation.y, 
+                                                                                        trans.transform.rotation.z, 
+                                                                                        trans.transform.rotation.w]))
+        orientation_rpy = orientation_rpy * 180/np.pi
+        # print(orientation_rpy)
+        
+        tol = 10 # angle tolerance
+        
+        edge_centre_pose = Pose()     # initialise zero pose for side
+        edge_centre_pose.position.x = 0
+        edge_centre_pose.position.y = 0
+        edge_centre_pose.position.z = 0
+        edge_centre_pose.orientation.x = 0
+        edge_centre_pose.orientation.y = 0
+        edge_centre_pose.orientation.z = 0
+        edge_centre_pose.orientation.w = 1
+        
+        edge_neg_side_pose = copy.deepcopy(edge_centre_pose)
+        edge_pos_side_pose = copy.deepcopy(edge_centre_pose)
+        
+        if any(np.isclose(orientation_rpy[0], [0, 180, -180], rtol=tol)) and any(np.isclose(orientation_rpy[1], [0, 180, -180], rtol=tol)):
+            # print("z axis (blue) is vertical")
+            v_offset = self.box_dim[1]/2
+            h_offset = self.box_dim[0]/2
+            
+            edge_pos_side_pose.position.x += h_offset - finger_offset
+            edge_neg_side_pose.position.x -= h_offset - finger_offset
+            
+            grasp_ori_rpy = [180, 0, 90]
+        elif any(np.isclose(orientation_rpy[1], [90, -90], rtol=tol)) and any(np.isclose(orientation_rpy[2], [0, 180, -180], rtol=tol)):
+            # print("x axis (red) is vertical")
+            v_offset = self.box_dim[0]/2
+            h_offset = self.box_dim[1]/2
+            
+            edge_pos_side_pose.position.z += h_offset - finger_offset
+            edge_neg_side_pose.position.z -= h_offset - finger_offset
+            
+            grasp_ori_rpy = [0, 90, 180]
+        elif any(np.isclose(orientation_rpy[0], [90, -90], rtol=tol)) and any(np.isclose(orientation_rpy[2], [0, 180, -180])):
+            print("y axis (green) is vertical, no graspable edge!")
+            # v_offset = self.box_dim[2]/2
+            return
+        
+        # correct orientation of grasp pose
+        grasp_ori_rpy = np.array(grasp_ori_rpy) * np.pi/180
+        grasp_ori = Quaternion(*tf_conversions.transformations.quaternion_from_euler(*grasp_ori_rpy))
+        
+        edge_centre_pose.orientation = grasp_ori
+        edge_pos_side_pose.orientation = grasp_ori
+        edge_neg_side_pose.orientation = grasp_ori
+        
+        # apply h_offset then transform for h_offset to save splitting the unholy logic statements above
+        try:
+            edge_centre_pose = tf_transform_pose(self.tf_buffer, edge_centre_pose, 'box_origin', 'base_link')
+            edge_pos_side_pose = tf_transform_pose(self.tf_buffer, edge_pos_side_pose, 'box_origin', 'base_link')
+            edge_neg_side_pose = tf_transform_pose(self.tf_buffer, edge_neg_side_pose, 'box_origin', 'base_link')
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            print("Can't see box!\n")
+            return
+        
+        # apply v_offset at the end
+        # only works if assuming edge is facing up!
+        edge_centre_pose.pose.position.z += v_offset
+        edge_pos_side_pose.pose.position.z += v_offset
+        edge_neg_side_pose.pose.position.z += v_offset
+        
+        # return or publish poses
+        self.centre_grasp_pub.publish(edge_centre_pose)
+        self.pos_grasp_pub.publish(edge_pos_side_pose)
+        self.neg_grasp_pub.publish(edge_neg_side_pose)
+        
+    def shutdown_detector(self):
+        self.markers_sub.unregister()
+        
 if __name__ == "__main__":
     pass
