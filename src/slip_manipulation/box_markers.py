@@ -93,7 +93,17 @@ class BoxMarkers():
         elif marker_id == 2:
             z_offset = -self.box_dim[2]/2
             rot_rpy = (np.pi/2, 0, 0)
-            
+        else:
+            print("No valid marker detected")
+
+        # for other box
+        # if marker_id == 3 or marker_id == 4:
+        #     z_offset = -0.114/2
+        # elif marker_id == 5 or marker_id == 6:
+        #     z_offset = -0.18/2
+        # elif marker_id == 1 or marker_id == 2:
+        #     z_offset = -0.04/2    
+
         t = TransformStamped()
 
         t.header.stamp = rospy.Time.now()
@@ -126,7 +136,7 @@ class BoxMarkers():
         try:
             box_from_base_stamped = tf_transform_pose(self.tf_buffer, box_pose, 'box_origin', 'base_link')
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-            print("Can't see box!\n")
+            print("Waiting for box transform\n")
             return
         
         mkr = Marker()
@@ -156,10 +166,15 @@ class BoxMarkers():
     
     def generate_grasp_pose(self):
         # assuming that at the beginning the box is upright
-        finger_offset = 0.02
+        finger_offset = 0.02 # offset from side of box to grasp position
         
         # check upright edge using transform from base_link
-        trans = self.tf_buffer.lookup_transform('box_origin', 'base_link', rospy.Time(0), timeout=rospy.Duration(2))
+        try:
+            trans = self.tf_buffer.lookup_transform('box_origin', 'base_link', rospy.Time(0), timeout=rospy.Duration(2))
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            print("Waiting for box transform\n")
+            return
+        
         orientation_rpy = np.array(tf_conversions.transformations.euler_from_quaternion([trans.transform.rotation.x, 
                                                                                         trans.transform.rotation.y, 
                                                                                         trans.transform.rotation.z, 
@@ -186,6 +201,7 @@ class BoxMarkers():
             v_offset = self.box_dim[1]/2
             h_offset = self.box_dim[0]/2
             
+            # apply horizontal offset
             edge_pos_side_pose.position.x += h_offset - finger_offset
             edge_neg_side_pose.position.x -= h_offset - finger_offset
             
@@ -195,6 +211,7 @@ class BoxMarkers():
             v_offset = self.box_dim[0]/2
             h_offset = self.box_dim[1]/2
             
+            # apply horizontal offset
             edge_pos_side_pose.position.z += h_offset - finger_offset
             edge_neg_side_pose.position.z -= h_offset - finger_offset
             
@@ -204,6 +221,11 @@ class BoxMarkers():
             # v_offset = self.box_dim[2]/2
             return
         
+        # apply vertical offset
+        edge_centre_pose.pose.position.z += v_offset
+        edge_pos_side_pose.pose.position.z += v_offset
+        edge_neg_side_pose.pose.position.z += v_offset
+
         # correct orientation of grasp pose
         grasp_ori_rpy = np.array(grasp_ori_rpy) * np.pi/180
         grasp_ori = Quaternion(*tf_conversions.transformations.quaternion_from_euler(*grasp_ori_rpy))
@@ -212,20 +234,14 @@ class BoxMarkers():
         edge_pos_side_pose.orientation = grasp_ori
         edge_neg_side_pose.orientation = grasp_ori
         
-        # apply h_offset then transform for h_offset to save splitting the unholy logic statements above
+        # transform to base_link frame
         try:
             edge_centre_pose = tf_transform_pose(self.tf_buffer, edge_centre_pose, 'box_origin', 'base_link')
             edge_pos_side_pose = tf_transform_pose(self.tf_buffer, edge_pos_side_pose, 'box_origin', 'base_link')
             edge_neg_side_pose = tf_transform_pose(self.tf_buffer, edge_neg_side_pose, 'box_origin', 'base_link')
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-            print("Can't see box!\n")
+            print("Waiting for box transform\n")
             return
-        
-        # apply v_offset at the end
-        # only works if assuming edge is facing up!
-        edge_centre_pose.pose.position.z += v_offset
-        edge_pos_side_pose.pose.position.z += v_offset
-        edge_neg_side_pose.pose.position.z += v_offset
         
         # return or publish poses
         self.centre_grasp_pub.publish(edge_centre_pose)
