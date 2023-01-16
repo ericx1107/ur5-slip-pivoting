@@ -162,7 +162,7 @@ class BoxMarkers():
     
         self.visualise_box_pub.publish(mkr)
     
-    def generate_grasp_pose(self):        
+    def generate_grasp_pose(self):
         # check upright edge using transform from base_link
         try:
             trans = self.tf_buffer.lookup_transform('box_origin', 'base_link', rospy.Time(0), timeout=rospy.Duration(2))
@@ -170,16 +170,8 @@ class BoxMarkers():
             print("Waiting for box transform\n")
             return
         
-        orientation_rpy = np.array(tf_conversions.transformations.euler_from_quaternion([trans.transform.rotation.x, 
-                                                                                        trans.transform.rotation.y, 
-                                                                                        trans.transform.rotation.z, 
-                                                                                        trans.transform.rotation.w]))
-        orientation_rpy = orientation_rpy * 180/np.pi
-        # print(orientation_rpy)
-        
-        tol = 10 # angle tolerance
-        
-        grasp_pose = Pose()     # initialise zero pose for side
+        # initialise zero pose to store info
+        grasp_pose = Pose()
         grasp_pose.position.x = 0
         grasp_pose.position.y = 0
         grasp_pose.position.z = 0
@@ -190,8 +182,9 @@ class BoxMarkers():
 
         finger_offset = 0.02 # offset from side of box to grasp position
 
+        # get input from user to specify grasp position
         grasp_param = raw_input("Enter grasp location parameter (-1 to 1)")
-
+        # check validity
         while True:
             try:
                 grasp_param = int(grasp_param)
@@ -206,7 +199,24 @@ class BoxMarkers():
             # passed all checks
             break
 
-        if any(np.isclose(orientation_rpy[0], [0, 180, -180], rtol=tol)) and any(np.isclose(orientation_rpy[1], [0, 180, -180], rtol=tol)):
+        # get rotation matrix for condition check
+        orientation_rpy = np.array(tf_conversions.transformations.euler_from_quaternion([trans.transform.rotation.x, 
+                                                                                        trans.transform.rotation.y, 
+                                                                                        trans.transform.rotation.z, 
+                                                                                        trans.transform.rotation.w]))
+        # orientation_rpy = orientation_rpy * 180/np.pi
+        # print(orientation_rpy)
+        
+        tol = 0.2 # absolute tolerance, for value that should be between -1 to 1
+
+        rot_mat = tf_conversions.transformations.euler_matrix(*orientation_rpy)
+
+        # need to find axis that is pointing in the direction of the z axis of the base_link frame (upright)
+        # for rotation matrix: find column with [0; 0; 1] (roughly)
+        # that column represents the axis that is transformed to point in the direction of the original z axis
+        # if -1 that means it's pointing in opposite directino to original z (down)
+
+        if all(np.isclose(rot_mat[:, 2], [0, 0, 1], atol=tol)) or all(np.isclose(rot_mat[:, 2], [0, 0, -1], atol=tol)):
             # print("z axis (blue) is vertical")
             v_offset = self.box_dim[1]/2
             h_offset = self.box_dim[0]/2
@@ -222,7 +232,7 @@ class BoxMarkers():
             grasp_pose.pose.position.z += v_offset
             
             grasp_ori_rpy = [180, 0, 90]
-        elif any(np.isclose(orientation_rpy[1], [90, -90], rtol=tol)) and any(np.isclose(orientation_rpy[2], [0, 180, -180], rtol=tol)):
+        elif all(np.isclose(rot_mat[:, 0], [0, 0, 1], atol=tol)) or all(np.isclose(rot_mat[:, 0], [0, 0, -1], atol=tol)):
             # print("x axis (red) is vertical")
             v_offset = self.box_dim[0]/2
             h_offset = self.box_dim[1]/2
@@ -238,10 +248,12 @@ class BoxMarkers():
             grasp_pose.pose.position.x += v_offset
             
             grasp_ori_rpy = [0, 90, 180]
-        elif any(np.isclose(orientation_rpy[0], [90, -90], rtol=tol)) and any(np.isclose(orientation_rpy[2], [0, 180, -180])):
+        if all(np.isclose(rot_mat[:, 1], [0, 0, 1], atol=tol)) or all(np.isclose(rot_mat[:, 1], [0, 0, -1], atol=tol)):
             print("y axis (green) is vertical, no graspable edge!")
             # v_offset = self.box_dim[2]/2
             return
+        else:
+            print("Uncaught case for object position. No side facing up found.")
 
         # correct orientation of grasp pose
         grasp_ori_rpy = np.array(grasp_ori_rpy) * np.pi/180
