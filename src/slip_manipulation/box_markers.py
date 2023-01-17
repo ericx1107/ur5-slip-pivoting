@@ -214,39 +214,55 @@ class BoxMarkers():
 
         rot_mat = tf_conversions.transformations.euler_matrix(*orientation_rpy, axes='sxyz')[:3, :3]
         # print(rot_mat)
+        new_z = rot_mat[:, 2]
 
         # need to find axis that is pointing in the direction of the z axis of the base_link frame (upright)
         # for rotation matrix: find column with [0; 0; 1] (roughly)
         # that column represents the axis that is transformed to point in the direction of the original z axis
         # if -1 that means it's pointing in opposite directino to original z (down)
 
-        if all(np.isclose(rot_mat[:, 2], [0, 0, 1], atol=tol)) or all(np.isclose(rot_mat[:, 2], [0, 0, -1], atol=tol)):
+        if all(np.isclose(new_z, [0, 0, 1], atol=tol)) or all(np.isclose(new_z, [0, 0, -1], atol=tol)):
             # print("z axis (blue) is vertical")
-            v_offset = self.box_dim[1]/2
-            h_offset = self.box_dim[0]/2
+            z_ori_coeff = np.sign(rot_mat[2, 2])    # is the new axis pointing in the same direction as the old z axis (up)?
+                                                    # 1 if same direction, -1 if opposite
+
+            v_offset = self.box_dim[1]/2    # TODO: need to remove some hard coding
+            h_offset = self.box_dim[0]/2    # use lhw parameters from dim instead?
             
             # max grasp position given by dimension of box, with some space for the whole finger
             grasp_max = h_offset - finger_offset
 
-            scaled_h_offset = grasp_max * grasp_param
+            scaled_h_offset = grasp_max * grasp_param   # positive grasp param corresponds to moving in the direction of positive axis
 
             # apply horizontal offset using grasp parameter
             grasp_pose.position.x += scaled_h_offset
             # apply vertical offset
-            grasp_pose.position.z += v_offset * np.sign(rot_mat[2, 2])
+            grasp_pose.position.z += v_offset * z_ori_coeff
             
-            grasp_ori_rpy = [180, 0, 90]
-            
-            if np.sign(rot_mat[2, 2]) == -1:
-                grasp_ori_rpy = [0, 0, 90]
+                                # grasp_ori_rpy = [180, 0, 90]
+                                
+                                # if np.sign(rot_mat[2, 2]) == -1:
+                                #     grasp_ori_rpy = [0, 0, 90]
                 
             # point y-axis of the gripper towards the origin of the box frame
             # find axis from box_origin that corresponds to this
-            # can't be z axis since it is known to be vertical
+            # given by x-axis in this configuration
             
-            
-        elif all(np.isclose(rot_mat[:, 2], [1, 0, 0], atol=tol)) or all(np.isclose(rot_mat[:, 2], [-1, 0, 0], atol=tol)):
+            # make rotation matrix to describe the rotation that would match
+                # the transform from box frame to gripper frame to give 
+                # the correct orientation to the grasp pose
+            box_to_grasp_x_col = np.array([0, 1, 0, 0]) * -np.sign(grasp_param) # box_x becomes grasp_y, point y towards the direction of pivot (box origin)
+            box_to_grasp_z_col = np.array([0, 0, 1, 0]) * -z_ori_coeff # box_z becomes grasp_z, point z down
+            box_to_grasp_y_col = np.cross(box_to_grasp_z_col, box_to_grasp_x_col) # x and z columns are constraining, get y as cross product
+            translate_col = np.array([0, 0, 0, 1]) # fully fill rotation matrix
+
+            grasp_rot_mat = np.transpose(np.array([box_to_grasp_x_col, box_to_grasp_y_col, box_to_grasp_z_col, translate_col]))
+
+        elif all(np.isclose(new_z, [1, 0, 0], atol=tol)) or all(np.isclose(new_z, [-1, 0, 0], atol=tol)):
             # print("x axis (red) is vertical")
+            z_ori_coeff = np.sign(rot_mat[0, 2])    # is the new axis pointing in the same direction as the old z axis (up)?
+                                                    # 1 if same direction, -1 if opposite
+
             v_offset = self.box_dim[0]/2
             h_offset = self.box_dim[1]/2
             
@@ -258,14 +274,21 @@ class BoxMarkers():
             # apply horizontal offset
             grasp_pose.position.z += scaled_h_offset
             # apply vertical offset
-            grasp_pose.position.x += v_offset * np.sign(rot_mat[0, 2])
+            grasp_pose.position.x += v_offset * z_ori_coeff
             
-            grasp_ori_rpy = [0, 90, 180]
-            
-            if np.sign(rot_mat[0, 2]) == -1:
-                grasp_ori_rpy = [0, 90, 0]
+                                # grasp_ori_rpy = [0, 90, 180]
+                                
+                                # if np.sign(rot_mat[0, 2]) == -1:
+                                #     grasp_ori_rpy = [0, 90, 0]
 
-        elif all(np.isclose(rot_mat[:, 2], [0, 1, 0], atol=tol)) or all(np.isclose(rot_mat[:, 2], [0, -1, 0], atol=tol)):
+            box_to_grasp_z_col = np.array([0, 1, 0, 0]) * -np.sign(grasp_param) # box_z becomes grasp_y, point y towards the direction of pivot (box origin)
+            box_to_grasp_x_col = np.array([0, 0, 1, 0]) * -z_ori_coeff # box_x becomes grasp_z, point z down
+            box_to_grasp_y_col = np.cross(box_to_grasp_z_col, box_to_grasp_x_col) # x and z columns are constraining, get y as cross product
+            translate_col = np.array([0, 0, 0, 1]) # fully fill rotation matrix
+
+            grasp_rot_mat = np.transpose(np.array([box_to_grasp_x_col, box_to_grasp_y_col, box_to_grasp_z_col, translate_col]))
+
+        elif all(np.isclose(new_z, [0, 1, 0], atol=tol)) or all(np.isclose(new_z, [0, -1, 0], atol=tol)):
             print("y axis (green) is vertical, no graspable edge!")
             # v_offset = self.box_dim[2]/2
             return
@@ -274,8 +297,7 @@ class BoxMarkers():
             return
 
         # correct orientation of grasp pose
-        grasp_ori_rpy = np.array(grasp_ori_rpy) * np.pi/180
-        grasp_ori = Quaternion(*tf_conversions.transformations.quaternion_from_euler(*grasp_ori_rpy))
+        grasp_ori = Quaternion(*tf_conversions.transformations.quaternion_from_matrix(grasp_rot_mat))
         
         grasp_pose.orientation = grasp_ori
         
