@@ -13,7 +13,13 @@ from std_msgs.msg import Header
 from slip_manipulation.get_tf_helper import *
 
 class BoxMarkers():
-    def __init__(self):
+    def __init__(self, box_dim, grasp_param=1, detect_once=False):
+        self.box_dim = box_dim # lhw
+        self.box_length = box_dim[0]
+        self.box_height = box_dim[1]
+        self.detect_once = detect_once
+        self.grasp_param = grasp_param
+        
         # ros publishers and subscribers
         self.markers_sub = rospy.Subscriber('/aruco_marker_publisher/markers', 
             MarkerArray, self.marker_callback)
@@ -55,11 +61,15 @@ class BoxMarkers():
         
             self.publish_box()
             
-            self.generate_grasp_pose()
+            self.generate_grasp_pose(self.grasp_param)
         
-        self.shutdown_detector() # only detect once
+        if self.detect_once:
+            self.shutdown_detector() # only detect once
 
     def publish_marker_transform(self, pose_stamped, marker_id):
+        '''
+        For visualisation in Rviz
+        '''
         t = TransformStamped()
 
         t.header = pose_stamped.header
@@ -76,23 +86,30 @@ class BoxMarkers():
         self.tf_broadcaster.sendTransform(t)
 
     def publish_box_origin_transform(self, marker_id):
+        '''
+        From marker position, publish the tf frame of the centre of the box
+        '''
         if marker_id == 3:
             z_offset = -self.box_dim[1]/2
-            rot_rpy = (0, 0, 0)             # TODO: match all axes of box_origin frame after converting
+            rot_rpy = (0, 0, 0)
         elif marker_id == 4:
             z_offset = -self.box_dim[1]/2
-            rot_rpy = (0, 0, np.pi/2)
-        elif marker_id == 5 or marker_id == 6:
+            rot_rpy = (0, np.pi, np.pi/2)
+        elif marker_id == 5:
             z_offset = -self.box_dim[0]/2
-            rot_rpy = (0, np.pi/2, np.pi/2)
+            rot_rpy = (0, -np.pi/2, np.pi/2)
+        elif marker_id == 6:
+            z_offset = -self.box_dim[0]/2
+            rot_rpy = (np.pi, np.pi/2, np.pi/2)
         elif marker_id == 1:
             z_offset = -self.box_dim[2]/2
-            rot_rpy = (np.pi/2, 0, np.pi/2)
+            rot_rpy = (-np.pi/2, np.pi, np.pi/2)
         elif marker_id == 2:
             z_offset = -self.box_dim[2]/2
-            rot_rpy = (np.pi/2, 0, 0)
+            rot_rpy = (-np.pi/2, 0, np.pi)
         else:
             print("No valid marker detected")
+            return
 
         # for other box
         # if marker_id == 3 or marker_id == 4:
@@ -119,6 +136,9 @@ class BoxMarkers():
         self.tf_broadcaster.sendTransform(t)
 
     def publish_box(self):
+        '''
+        Publish visualisation marker for visualisation in Rviz
+        '''
         # construct Pose at the origin of box_origin frame
         box_pose = Pose()
         box_pose.position.x = 0
@@ -144,9 +164,9 @@ class BoxMarkers():
         mkr.type = Marker.CUBE
         mkr.action = Marker.ADD
         mkr.pose = box_from_base_stamped.pose
-        mkr.scale.x = 0.18
-        mkr.scale.y = 0.04
-        mkr.scale.z = 0.114
+        mkr.scale.x = self.box_dim[0]
+        mkr.scale.y = self.box_dim[2]
+        mkr.scale.z = self.box_dim[1]
         mkr.color.a = 1.0
         mkr.color.r = 0.0
         mkr.color.g = 0.0
@@ -162,7 +182,7 @@ class BoxMarkers():
     
         self.visualise_box_pub.publish(mkr)
     
-    def generate_grasp_pose(self):
+    def generate_grasp_pose(self, grasp_param=1):
         # check upright edge using transform from base_link
         try:
             trans = self.tf_buffer.lookup_transform('box_origin', 'base_link', rospy.Time(0), timeout=rospy.Duration(2))
@@ -182,34 +202,18 @@ class BoxMarkers():
 
         finger_offset = 0.02 # offset from side of box to grasp position
 
-        # get input from user to specify grasp position
-        grasp_param = raw_input("Enter grasp location parameter (-1 to 1)")
-        # check validity
-        while True:
-            try:
-                grasp_param = int(grasp_param)
-            except ValueError:
-                print("Enter a number!")
-                continue
-
-            if not -1 <= grasp_param <= 1:
-                print("Enter a number between -1 and 1!")
-                continue
-            
-            # passed all checks
-            break
-
         # get rotation matrix for condition check
         orientation_rpy = np.array(tf_conversions.transformations.euler_from_quaternion([trans.transform.rotation.x, 
                                                                                         trans.transform.rotation.y, 
                                                                                         trans.transform.rotation.z, 
                                                                                         trans.transform.rotation.w]))
-        # orientation_rpy = orientation_rpy * 180/np.pi
-        # print(orientation_rpy)
+        # orientation_rpy_for_print = orientation_rpy * 180/np.pi
+        # print(orientation_rpy_for_print)
         
         tol = 0.2 # absolute tolerance, for value that should be between -1 to 1
 
-        rot_mat = tf_conversions.transformations.euler_matrix(*orientation_rpy)
+        rot_mat = tf_conversions.transformations.euler_matrix(*orientation_rpy, axes='sxyz')[:3, :3]
+        # print(rot_mat)
 
         # need to find axis that is pointing in the direction of the z axis of the base_link frame (upright)
         # for rotation matrix: find column with [0; 0; 1] (roughly)
@@ -229,10 +233,19 @@ class BoxMarkers():
             # apply horizontal offset using grasp parameter
             grasp_pose.position.x += scaled_h_offset
             # apply vertical offset
-            grasp_pose.pose.position.z += v_offset
+            grasp_pose.position.z += v_offset * np.sign(rot_mat[2, 2])
             
             grasp_ori_rpy = [180, 0, 90]
-        elif all(np.isclose(rot_mat[:, 0], [0, 0, 1], atol=tol)) or all(np.isclose(rot_mat[:, 0], [0, 0, -1], atol=tol)):
+            
+            if np.sign(rot_mat[2, 2]) == -1:
+                grasp_ori_rpy = [0, 0, 90]
+                
+            # point y-axis of the gripper towards the origin of the box frame
+            # find axis from box_origin that corresponds to this
+            # can't be z axis since it is known to be vertical
+            
+            
+        elif all(np.isclose(rot_mat[:, 2], [1, 0, 0], atol=tol)) or all(np.isclose(rot_mat[:, 2], [-1, 0, 0], atol=tol)):
             # print("x axis (red) is vertical")
             v_offset = self.box_dim[0]/2
             h_offset = self.box_dim[1]/2
@@ -245,15 +258,20 @@ class BoxMarkers():
             # apply horizontal offset
             grasp_pose.position.z += scaled_h_offset
             # apply vertical offset
-            grasp_pose.pose.position.x += v_offset
+            grasp_pose.position.x += v_offset * np.sign(rot_mat[0, 2])
             
             grasp_ori_rpy = [0, 90, 180]
-        if all(np.isclose(rot_mat[:, 1], [0, 0, 1], atol=tol)) or all(np.isclose(rot_mat[:, 1], [0, 0, -1], atol=tol)):
+            
+            if np.sign(rot_mat[0, 2]) == -1:
+                grasp_ori_rpy = [0, 90, 0]
+
+        elif all(np.isclose(rot_mat[:, 2], [0, 1, 0], atol=tol)) or all(np.isclose(rot_mat[:, 2], [0, -1, 0], atol=tol)):
             print("y axis (green) is vertical, no graspable edge!")
             # v_offset = self.box_dim[2]/2
             return
         else:
             print("Uncaught case for object position. No side facing up found.")
+            return
 
         # correct orientation of grasp pose
         grasp_ori_rpy = np.array(grasp_ori_rpy) * np.pi/180

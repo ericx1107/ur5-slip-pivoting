@@ -15,19 +15,24 @@ from moveit_msgs.msg import Constraints, JointConstraint
 from slip_manipulation.ur5_moveit import UR5Moveit
 from slip_manipulation.box_markers import BoxMarkers
 from slip_manipulation.sensorised_gripper import SensorisedGripper
+from slip_manipulation.arc import Arc_Moving
 
 class BoxDemo():
-    def __init__(self):
+    def __init__(self, box_dim, grasp_param):
         self.ur5 = UR5Moveit()
-        self.markers = BoxMarkers()
+        
+        self.grasp_param = grasp_param
+        
+        self.markers = BoxMarkers(box_dim, self.grasp_param)
         self.gripper = SensorisedGripper()
-
-        self.pos_grasp_sub = rospy.Subscriber('/slip_manipulation/pos_grasp', PoseStamped, self.callback)
+        self.arc = Arc_Moving( self.markers.box_length, self.markers.box_height, self.ur5.arm)
+        
+        self.pos_grasp_sub = rospy.Subscriber('/slip_manipulation/grasp_pose', PoseStamped, self.callback)
         self.grasp_pub = rospy.Publisher('test_grasp', PoseStamped, queue_size=1)
 
         self.pregrasp_offset = 0.05
         
-        self.ee_offset = 0.15
+        self.ee_offset = 0.18
 
         self.grasp_goal = PoseStamped()
 
@@ -36,11 +41,35 @@ class BoxDemo():
         self.grasp_goal.pose.position.z += self.ee_offset
 
 
-if __name__ == "__main__":
+if True:
     rospy.init_node('box_demo')
+    box_dim = [0.18, 0.11, 0.04]
+    
+    # get grasp position from user
+    grasp_param = raw_input("Enter grasp location parameter (-1 to 1)\n")
+    # check validity
+    while True:
+            try:
+                grasp_param = int(grasp_param)
+            except ValueError:
+                print("Enter a number!\n")
+                continue
 
-    demo = BoxDemo()
+            if not -1 <= grasp_param <= 1:
+                print("Enter a number between -1 and 1!\n")
+                continue
+            
+            # passed all checks
+            break
+    
+    # initialise class object
+    demo = BoxDemo(box_dim, grasp_param)
+    # wait for some topics to publish
     rospy.sleep(10)
+    
+    # get grasp goal while blocking
+    demo.grasp_goal = rospy.wait_for_message('/slip_manipulation/grasp_pose', PoseStamped)
+    demo.grasp_goal.pose.position.z += demo.ee_offset
     
     # move to goal
     pregrasp_pose = copy.deepcopy(demo.grasp_goal)
@@ -58,9 +87,17 @@ if __name__ == "__main__":
 
     # close gripper
     raw_input("press enter to close gripper")
-    demo.gripper.send_gripper_command(commandName=None, grip_width=116)
+    demo.gripper.send_gripper_command(commandName=None, grip_width=123)
 
 
+    cartesian_plan= demo.arc.plan_cartesian_path()
+
+    raw_input("check rviz before execute")
+    demo.ur5.arm.execute(cartesian_plan, wait=True)
+
+    # open gripper
+    raw_input("press enter to open gripper")
+    demo.gripper.send_gripper_command(commandName=None, grip_width=0)
 
 
 # ur5.arm.set_pose_reference_frame('base_link')

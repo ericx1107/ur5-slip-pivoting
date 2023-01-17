@@ -25,7 +25,7 @@ class UR5Moveit():
         self.pose_publisher = rospy.Publisher('display_pose', PoseStamped, queue_size=1)
 
         self.arm = moveit_commander.MoveGroupCommander('manipulator')
-        self.arm.set_planner_id("RRTstar") # /home/acrv/HRIGroupAdmin/example_ros_ws/src/universal_robot/ur5_moveit_config/config/ompl_planning.yaml
+        self.arm.set_planner_id("RRTConnect") # /home/acrv/HRIGroupAdmin/example_ros_ws/src/universal_robot/ur5_moveit_config/config/ompl_planning.yaml
 
         # print(moveit_commander.RobotCommander().get_link_names())
 
@@ -101,54 +101,8 @@ class UR5Moveit():
 
         self.arm.execute(plan)
 
-    # @staticmethod
-    # def tf_transform_pose(input_pose, from_frame, to_frame):
-    #     tf_buffer = tf2_ros.Buffer()
-    #     listener = tf2_ros.TransformListener(tf_buffer)
-
-    #     # make PoseStamped message from Pose input
-    #     pose_stamped = tf2_geometry_msgs.PoseStamped()
-    #     pose_stamped.pose = input_pose
-    #     pose_stamped.header.frame_id = from_frame
-    #     pose_stamped.header.stamp = rospy.Time(0)
-
-    #     try:
-    #         # ** It is important to wait for the listener to start listening. Hence the rospy.Duration(1)
-    #         output_pose_stamped = tf_buffer.transform(pose_stamped, to_frame, rospy.Duration(2), PoseStamped)
-    #         # tf_buffer.transform is incorrectly documented as giving no returns. The return below is mistaken by vs code as unreachable
-    #         return output_pose_stamped
-
-    #     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-    #         raise
-
     def display_pose(self, pose):
         self.pose_publisher.publish(pose)
-
-    def plan_cartesian_path(self, r=0.2):
-        # z is up and down, x is the direction of "home", y is the side  
-        waypoints = []
-        wpose = self.arm.get_current_pose().pose
-        temp = copy.deepcopy(wpose)
-
-        for theta in np.linspace(0,90,90):
-            wpose.position.z = temp.position.z + r*math.sin(math.radians(theta))
-            wpose.position.x = temp.position.x - (r-r*math.cos(math.radians(theta)))
-            waypoints.append(copy.deepcopy(wpose)) 
-  
-
-
-
-		# We want the Cartesian path to be interpolated at a resolution of 1 cm
-		# which is why we will specify 0.01 as the eef_step in Cartesian
-		# translation.
-        (plan, fraction) = self.arm.compute_cartesian_path(
-										waypoints,   # waypoints to follow
-										0.01,      # eef_step  
-										0.0)         # jump_threshold  
-
-		# Note: We are just planning, not asking move_group to actually move the robot yet:
-        print("=========== Planning completed, Cartesian path is saved=============")
-        return plan, fraction
 
 if __name__ == "__main__":
     pass
