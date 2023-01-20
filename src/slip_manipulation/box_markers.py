@@ -32,7 +32,7 @@ class BoxMarkers():
         
         self.long_pub = rospy.Publisher('/slip_manipulation/is_long_edge', Bool, queue_size=1)
 
-        # self.marker_list = defaultdict(lambda: {"pose": 0})
+        self.marker_list = defaultdict(lambda: {"pose": 0})
 
         # tf things
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
@@ -45,7 +45,7 @@ class BoxMarkers():
     
     def marker_callback(self, marker_array):
         for marker in marker_array.markers:
-            # self.marker_list[str(marker.id)]["pose"] = marker.pose.pose
+            self.marker_list[str(marker.id)]["pose"] = marker.pose.pose
             
             # construct stamped message
             stamped = PoseStamped()
