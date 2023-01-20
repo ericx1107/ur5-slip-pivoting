@@ -23,9 +23,10 @@ class UR5Moveit():
         self.table_size = [2, 2, 0.87]
 
         self.pose_publisher = rospy.Publisher('display_pose', PoseStamped, queue_size=1)
-
+        
         self.arm = moveit_commander.MoveGroupCommander('manipulator')
-        self.arm.set_planner_id("RRTConnect") # /home/acrv/HRIGroupAdmin/example_ros_ws/src/universal_robot/ur5_moveit_config/config/ompl_planning.yaml
+      
+        self.arm.set_planner_id("RRTStar") # /home/acrv/HRIGroupAdmin/example_ros_ws/src/universal_robot/ur5_moveit_config/config/ompl_planning.yaml
 
         # print(moveit_commander.RobotCommander().get_link_names())
 
@@ -59,6 +60,9 @@ class UR5Moveit():
         self.scene.add_box(box_name, box_pose, size=self.table_size)
 
     def init_moveit_constraints(self):
+        # clear existing constraints
+        self.arm.clear_path_constraints()
+        
         self.camera_constraints = Constraints()
         self.camera_constraints.name = 'camera'
         

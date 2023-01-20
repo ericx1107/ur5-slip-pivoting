@@ -9,7 +9,7 @@ from aruco_msgs.msg import MarkerArray
 from collections import defaultdict
 from geometry_msgs.msg import Pose, PoseStamped, TransformStamped, Quaternion
 from visualization_msgs.msg import Marker
-from std_msgs.msg import Header
+from std_msgs.msg import Bool
 from slip_manipulation.get_tf_helper import *
 
 class BoxMarkers():
@@ -29,6 +29,8 @@ class BoxMarkers():
         self.visualise_box_pub = rospy.Publisher('/slip_manipulation/box_visualisation', Marker, queue_size=1)
         
         self.grasp_pub = rospy.Publisher('/slip_manipulation/grasp_pose', PoseStamped, queue_size=1)
+        
+        self.long_pub = rospy.Publisher('/slip_manipulation/is_long_edge', Bool, queue_size=1)
 
         # self.marker_list = defaultdict(lambda: {"pose": 0})
 
@@ -49,8 +51,6 @@ class BoxMarkers():
             stamped = PoseStamped()
             stamped.header = marker.header
             stamped.pose = marker.pose.pose
-
-            self.box_dim = [0.18, 0.114, 0.04] # lwh
 
             # publish marker pose
             self.markers_pose_pub.publish(stamped)
@@ -89,27 +89,36 @@ class BoxMarkers():
         '''
         From marker position, publish the tf frame of the centre of the box
         '''
+        # new box
         if marker_id == 3:
             z_offset = -self.box_dim[1]/2
             rot_rpy = (0, 0, 0)
         elif marker_id == 4:
-            z_offset = -self.box_dim[1]/2
-            rot_rpy = (0, np.pi, np.pi/2)
-        elif marker_id == 5:
             z_offset = -self.box_dim[0]/2
-            rot_rpy = (0, -np.pi/2, np.pi/2)
-        elif marker_id == 6:
-            z_offset = -self.box_dim[0]/2
-            rot_rpy = (np.pi, np.pi/2, np.pi/2)
-        elif marker_id == 1:
-            z_offset = -self.box_dim[2]/2
-            rot_rpy = (-np.pi/2, np.pi, np.pi/2)
-        elif marker_id == 2:
-            z_offset = -self.box_dim[2]/2
-            rot_rpy = (-np.pi/2, 0, np.pi)
-        else:
-            print("No valid marker detected")
-            return
+            rot_rpy = (0, np.pi/2, 0)
+            
+        # # box 1
+        # if marker_id == 3:
+        #     z_offset = -self.box_dim[1]/2
+        #     rot_rpy = (0, 0, 0)
+        # elif marker_id == 4:
+        #     z_offset = -self.box_dim[1]/2
+        #     rot_rpy = (0, np.pi, np.pi/2)
+        # elif marker_id == 5:
+        #     z_offset = -self.box_dim[0]/2
+        #     rot_rpy = (0, -np.pi/2, np.pi/2)
+        # elif marker_id == 6:
+        #     z_offset = -self.box_dim[0]/2
+        #     rot_rpy = (np.pi, np.pi/2, np.pi/2)
+        # elif marker_id == 1:
+        #     z_offset = -self.box_dim[2]/2
+        #     rot_rpy = (-np.pi/2, np.pi, np.pi/2)
+        # elif marker_id == 2:
+        #     z_offset = -self.box_dim[2]/2
+        #     rot_rpy = (-np.pi/2, 0, np.pi)
+        # else:
+        #     print("No valid marker detected")
+        #     return
 
         # for other box
         # if marker_id == 3 or marker_id == 4:
@@ -222,7 +231,8 @@ class BoxMarkers():
         # if -1 that means it's pointing in opposite directino to original z (down)
 
         if all(np.isclose(new_z, [0, 0, 1], atol=tol)) or all(np.isclose(new_z, [0, 0, -1], atol=tol)):
-            # print("z axis (blue) is vertical")
+            # print("z axis (blue) is vertical, long side")
+            self.long_pub.publish(True)
             z_ori_coeff = np.sign(rot_mat[2, 2])    # is the new axis pointing in the same direction as the old z axis (up)?
                                                     # 1 if same direction, -1 if opposite
 
@@ -251,15 +261,24 @@ class BoxMarkers():
             # make rotation matrix to describe the rotation that would match
                 # the transform from box frame to gripper frame to give 
                 # the correct orientation to the grasp pose
-            box_to_grasp_x_col = np.array([0, 1, 0, 0]) * -np.sign(grasp_param) # box_x becomes grasp_y, point y towards the direction of pivot (box origin)
-            box_to_grasp_z_col = np.array([0, 0, 1, 0]) * -z_ori_coeff # box_z becomes grasp_z, point z down
-            box_to_grasp_y_col = np.cross(box_to_grasp_z_col, box_to_grasp_x_col) # x and z columns are constraining, get y as cross product
+            # box_to_grasp_x_col = np.array([0, 1, 0, 0]) * -np.sign(grasp_param) # box_x becomes grasp_y, point y towards the direction of pivot (box origin)
+            # box_to_grasp_z_col = np.array([0, 0, 1, 0]) * -z_ori_coeff # box_z becomes grasp_z, point z down
+            # box_to_grasp_y_col = np.cross(box_to_grasp_z_col[:3], box_to_grasp_x_col[:3]) # x and z columns are constraining, get y as cross product
+            # box_to_grasp_y_col = np.append(box_to_grasp_y_col, 0)
+            # translate_col = np.array([0, 0, 0, 1]) # fully fill rotation matrix
+            
+            grasp_to_box_y_col = np.array([1, 0, 0, 0]) * -np.sign(grasp_param) # box_x becomes grasp_y, point y towards the direction of pivot (box origin)
+            grasp_to_box_z_col = np.array([0, 0, 1, 0]) * -z_ori_coeff # box_z becomes grasp_z, point z down
+            grasp_to_box_x_col = np.cross(grasp_to_box_y_col[:3], grasp_to_box_z_col[:3]) # x and z columns are constraining, get y as cross product
+            grasp_to_box_x_col = np.append(grasp_to_box_x_col, 0)
             translate_col = np.array([0, 0, 0, 1]) # fully fill rotation matrix
 
-            grasp_rot_mat = np.transpose(np.array([box_to_grasp_x_col, box_to_grasp_y_col, box_to_grasp_z_col, translate_col]))
+            # grasp_rot_mat = np.transpose(np.array([box_to_grasp_x_col, box_to_grasp_y_col, box_to_grasp_z_col, translate_col]))
+            grasp_rot_mat = np.transpose(np.array([grasp_to_box_x_col, grasp_to_box_y_col, grasp_to_box_z_col, translate_col]))
 
         elif all(np.isclose(new_z, [1, 0, 0], atol=tol)) or all(np.isclose(new_z, [-1, 0, 0], atol=tol)):
-            # print("x axis (red) is vertical")
+            # print("x axis (red) is vertical, short side")
+            self.long_pub.publish(False)
             z_ori_coeff = np.sign(rot_mat[0, 2])    # is the new axis pointing in the same direction as the old z axis (up)?
                                                     # 1 if same direction, -1 if opposite
 
@@ -281,12 +300,20 @@ class BoxMarkers():
                                 # if np.sign(rot_mat[0, 2]) == -1:
                                 #     grasp_ori_rpy = [0, 90, 0]
 
-            box_to_grasp_z_col = np.array([0, 1, 0, 0]) * -np.sign(grasp_param) # box_z becomes grasp_y, point y towards the direction of pivot (box origin)
-            box_to_grasp_x_col = np.array([0, 0, 1, 0]) * -z_ori_coeff # box_x becomes grasp_z, point z down
-            box_to_grasp_y_col = np.cross(box_to_grasp_z_col, box_to_grasp_x_col) # x and z columns are constraining, get y as cross product
+            # box_to_grasp_z_col = np.array([0, 1, 0, 0]) * -np.sign(grasp_param) # box_z becomes grasp_y, point y towards the direction of pivot (box origin)
+            # box_to_grasp_x_col = np.array([0, 0, 1, 0]) * -z_ori_coeff # box_x becomes grasp_z, point z down
+            # box_to_grasp_y_col = np.cross(box_to_grasp_z_col[:3], box_to_grasp_x_col[:3]) # x and z columns are constraining, get y as cross product
+            # box_to_grasp_y_col = np.append(box_to_grasp_y_col, 0)
+            
+            grasp_to_box_y_col = np.array([0, 0, 1, 0]) * -np.sign(grasp_param) # box_z becomes grasp_y, point y towards the direction of pivot (box origin)
+            grasp_to_box_z_col = np.array([1, 0, 0, 0]) * -z_ori_coeff # box_x becomes grasp_z, point z down
+            grasp_to_box_x_col = np.cross(grasp_to_box_y_col[:3], grasp_to_box_z_col[:3]) # x and z columns are constraining, get y as cross product
+            grasp_to_box_x_col = np.append(grasp_to_box_x_col, 0)
+            
             translate_col = np.array([0, 0, 0, 1]) # fully fill rotation matrix
 
-            grasp_rot_mat = np.transpose(np.array([box_to_grasp_x_col, box_to_grasp_y_col, box_to_grasp_z_col, translate_col]))
+            # grasp_rot_mat = np.transpose(np.array([box_to_grasp_x_col, box_to_grasp_y_col, box_to_grasp_z_col, translate_col]))
+            grasp_rot_mat = np.transpose(np.array([grasp_to_box_x_col, grasp_to_box_y_col, grasp_to_box_z_col, translate_col]))
 
         elif all(np.isclose(new_z, [0, 1, 0], atol=tol)) or all(np.isclose(new_z, [0, -1, 0], atol=tol)):
             print("y axis (green) is vertical, no graspable edge!")

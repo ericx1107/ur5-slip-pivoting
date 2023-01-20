@@ -12,6 +12,7 @@ import json
 import numpy as np
 import tf2_ros
 from slip_manipulation.get_tf_helper import *
+from std_msgs.msg import Bool
 
 '''class MoveGroupInteface(object):
 	def __init__(self):
@@ -60,14 +61,27 @@ class Arc_Moving():
     # long: boolean for if we are making the long direction of the box lay down on the ground
     # arm: "the move_group_commander", used for cartesian path
     # shift: the shifted value along the x direction
-    def __init__(self,  box_length, box_height, arm, shift=0.02):
-        self.length = box_length-shift
-        self.height = box_height
-        # self.pose = 
-        self.shift = shift
+    
+    '''
+    To change the pivoting from long -> short or short -> long: flip the length and width
+    
+    To go forward or backward, change self.forward to true / false
+    '''
+    def __init__(self, box_dim, arm, grasp_param):
+        self.long = rospy.wait_for_message('/slip_manipulation/is_long_edge', Bool, timeout=rospy.Duration(10))
+        
+        if self.long.data:
+            # print("long is true")
+            shift = (1 - abs(grasp_param)) * box_dim[0]/2
+            self.length = box_dim[0]-shift
+            self.height = box_dim[1]
+        else:
+            # print("long is false")
+            shift = (1 - abs(grasp_param)) * box_dim[1]/2
+            self.length = box_dim[1]-shift
+            self.height = box_dim[0]
+            
         self.arm = arm
-        self.forward = True
-        self.cof = 1 if self.forward else -1 
 
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
@@ -86,7 +100,7 @@ class Arc_Moving():
                 print("Waiting for box transform\n")
             
         temp = copy.deepcopy(wpose)
-        print(temp)
+        # print(temp)
         r = np.hypot(self.length, self.height)
         angle = math.degrees(np.arctan(self.height/self.length))
         # axis_angle = self.arm.get_current_joint_values()[0]
@@ -95,9 +109,9 @@ class Arc_Moving():
             # change is always positive
             # cos is always positive -> change * cos is positive -> x is positive
             # sin is always negative -> change * sin is negative -> y is negative
-        for theta in np.linspace(angle,90+angle,100):
-            wpose.position.z = -(r*math.sin(math.radians(theta))) #+ 0.15
-            wpose.position.y = self.cof*(temp.position.y + (self.length - r*math.cos(math.radians(theta))))
+        for theta in np.linspace(angle,85+angle,100):
+            wpose.position.z = -(r*math.sin(math.radians(theta))) + self.height
+            wpose.position.y = (temp.position.y + (self.length - r*math.cos(math.radians(theta))))
             
             wpose_base = tf_transform_pose(self.tf_buffer, wpose, 'tool0', 'base_link').pose
             waypoints.append(copy.deepcopy(wpose_base)) 

@@ -21,8 +21,8 @@ ur5 = UR5Moveit()
 # plan, _ = ur5.plan_cartesian_path(r = 0.09)
 # raw_input("Enter to execute")
 # ur5.arm.execute(plan)
-
-markers = BoxMarkers()
+box_dim = [0.18, 0.11, 0.04]
+markers = BoxMarkers(box_dim, detect_once=False)
 
 # while not rospy.is_shutdown():
 #     markers.publish_box()
