@@ -1,23 +1,16 @@
 #! /usr/bin/env python
 
 import rospy
-import moveit_commander
 import numpy as np
-import open3d
 import copy
-from time import sleep
-from std_msgs.msg import String
-import roslib; roslib.load_manifest('robotiq_2f_gripper_control')
-from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_output  as outputMsg
 from geometry_msgs.msg import PoseStamped
-from sensor_msgs.msg import PointCloud2
 from moveit_msgs.msg import Constraints, OrientationConstraint
 from slip_manipulation.ur5_moveit import UR5Moveit
 from slip_manipulation.box_markers import BoxMarkers
 from slip_manipulation.sensorised_gripper import SensorisedGripper
-from slip_manipulation.arc import Arc_Moving
+from slip_manipulation.arc_trajectory import ArcTrajectory
 
-class BoxDemo():
+class OpenLoopPivoting():
     def __init__(self, box_dim, grasp_param):
         self.ur5 = UR5Moveit()
         
@@ -25,7 +18,7 @@ class BoxDemo():
         
         self.markers = BoxMarkers(box_dim, self.grasp_param)
         self.gripper = SensorisedGripper()
-        self.arc = Arc_Moving(box_dim, self.ur5.arm, self.grasp_param)
+        self.arc = ArcTrajectory(box_dim, self.ur5.arm, self.grasp_param)
         
         # self.pos_grasp_sub = rospy.Subscriber('/slip_manipulation/grasp_pose', PoseStamped, self.callback)
         self.grasp_pub = rospy.Publisher('test_grasp', PoseStamped, queue_size=1)
@@ -66,7 +59,7 @@ if __name__ == "__main__":
                 break
         
         # initialise class object
-        demo = BoxDemo(box_dim, grasp_param)
+        demo = OpenLoopPivoting(box_dim, grasp_param)
         # wait for some topics to publish
         # rospy.sleep(10)
         

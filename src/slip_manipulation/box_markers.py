@@ -14,9 +14,10 @@ from slip_manipulation.get_tf_helper import *
 
 class BoxMarkers():
     def __init__(self, box_dim, grasp_param=1, detect_once=False):
-        self.box_dim = box_dim # lhw
+        self.box_dim = box_dim # lwh
         self.box_length = box_dim[0]
-        self.box_height = box_dim[1]
+        self.box_width = box_dim[1]
+        self.box_height = box_dim[2]
         self.detect_once = detect_once
         self.grasp_param = grasp_param
         
@@ -248,11 +249,6 @@ class BoxMarkers():
             grasp_pose.position.x += scaled_h_offset
             # apply vertical offset
             grasp_pose.position.z += v_offset * z_ori_coeff
-            
-                                # grasp_ori_rpy = [180, 0, 90]
-                                
-                                # if np.sign(rot_mat[2, 2]) == -1:
-                                #     grasp_ori_rpy = [0, 0, 90]
                 
             # point y-axis of the gripper towards the origin of the box frame
             # find axis from box_origin that corresponds to this
@@ -261,11 +257,6 @@ class BoxMarkers():
             # make rotation matrix to describe the rotation that would match
                 # the transform from box frame to gripper frame to give 
                 # the correct orientation to the grasp pose
-            # box_to_grasp_x_col = np.array([0, 1, 0, 0]) * -np.sign(grasp_param) # box_x becomes grasp_y, point y towards the direction of pivot (box origin)
-            # box_to_grasp_z_col = np.array([0, 0, 1, 0]) * -z_ori_coeff # box_z becomes grasp_z, point z down
-            # box_to_grasp_y_col = np.cross(box_to_grasp_z_col[:3], box_to_grasp_x_col[:3]) # x and z columns are constraining, get y as cross product
-            # box_to_grasp_y_col = np.append(box_to_grasp_y_col, 0)
-            # translate_col = np.array([0, 0, 0, 1]) # fully fill rotation matrix
             
             grasp_to_box_y_col = np.array([1, 0, 0, 0]) * -np.sign(grasp_param) # box_x becomes grasp_y, point y towards the direction of pivot (box origin)
             grasp_to_box_z_col = np.array([0, 0, 1, 0]) * -z_ori_coeff # box_z becomes grasp_z, point z down
@@ -295,16 +286,6 @@ class BoxMarkers():
             # apply vertical offset
             grasp_pose.position.x += v_offset * z_ori_coeff
             
-                                # grasp_ori_rpy = [0, 90, 180]
-                                
-                                # if np.sign(rot_mat[0, 2]) == -1:
-                                #     grasp_ori_rpy = [0, 90, 0]
-
-            # box_to_grasp_z_col = np.array([0, 1, 0, 0]) * -np.sign(grasp_param) # box_z becomes grasp_y, point y towards the direction of pivot (box origin)
-            # box_to_grasp_x_col = np.array([0, 0, 1, 0]) * -z_ori_coeff # box_x becomes grasp_z, point z down
-            # box_to_grasp_y_col = np.cross(box_to_grasp_z_col[:3], box_to_grasp_x_col[:3]) # x and z columns are constraining, get y as cross product
-            # box_to_grasp_y_col = np.append(box_to_grasp_y_col, 0)
-            
             grasp_to_box_y_col = np.array([0, 0, 1, 0]) * -np.sign(grasp_param) # box_z becomes grasp_y, point y towards the direction of pivot (box origin)
             grasp_to_box_z_col = np.array([1, 0, 0, 0]) * -z_ori_coeff # box_x becomes grasp_z, point z down
             grasp_to_box_x_col = np.cross(grasp_to_box_y_col[:3], grasp_to_box_z_col[:3]) # x and z columns are constraining, get y as cross product
@@ -329,12 +310,7 @@ class BoxMarkers():
         grasp_pose.orientation = grasp_ori
         
         # transform to base_link frame
-        while True:
-            try:
-                grasp_pose = tf_transform_pose(self.tf_buffer, grasp_pose, 'box_origin', 'base_link')
-                break
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                print("Waiting for box transform\n")
+        grasp_pose = tf_transform_pose(self.tf_buffer, grasp_pose, 'box_origin', 'base_link', loop=True)
         
         # return or publish poses
         self.grasp_pub.publish(grasp_pose)
