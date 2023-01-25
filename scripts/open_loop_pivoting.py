@@ -99,7 +99,7 @@ if __name__ == "__main__":
 
         # close gripper
         raw_input("press enter to close gripper")
-        demo.gripper.send_gripper_command(commandName=None, grip_width=124) # 124 for long
+        demo.gripper.send_gripper_command(commandName=None, grip_width=130) # 124 for long
 
 
         cartesian_plan= demo.arc.plan_cartesian_path()
