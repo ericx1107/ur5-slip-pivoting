@@ -90,13 +90,19 @@ class BoxMarkers():
         '''
         From marker position, publish the tf frame of the centre of the box
         '''
-        # new box
+        # box 3
         if marker_id == 3:
             z_offset = -self.box_dim[1]/2
             rot_rpy = (0, 0, 0)
         elif marker_id == 4:
             z_offset = -self.box_dim[0]/2
             rot_rpy = (0, np.pi/2, 0)
+        elif marker_id == 2:
+            z_offset = -self.box_dim[2]/2
+            rot_rpy = (-np.pi/2, 0, np.pi)
+        else:
+            print("No valid marker detected")
+            return
             
         # # box 1
         # if marker_id == 3:
@@ -144,6 +150,7 @@ class BoxMarkers():
         t.transform.rotation.w = q[3]
 
         self.tf_broadcaster.sendTransform(t)
+        # print("Published box transform")
 
     def publish_box(self):
         '''
@@ -161,9 +168,9 @@ class BoxMarkers():
         
         # trans = self.tf_buffer.lookup_transform('box_origin', 'base_link', rospy.Time(0), timeout=rospy.Duration(2))
         # print("got transform")
-        try:
-            box_from_base_stamped = tf_transform_pose(self.tf_buffer, box_pose, 'box_origin', 'base_link')
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+        box_from_base_stamped = tf_transform_pose(self.tf_buffer, box_pose, 'box_origin', 'base_link', loop=False)
+        
+        if box_from_base_stamped is None:
             print("Waiting for box transform\n")
             return
         

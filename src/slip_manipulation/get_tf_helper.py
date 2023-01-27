@@ -11,7 +11,7 @@ def tf_transform_pose(tf_buffer, input_pose, from_frame, to_frame, loop=True):
     pose_stamped.header.stamp = rospy.Time(0)
 
     if loop:
-        while True:
+        while not rospy.is_shutdown():
             try:
                 # ** It is important to wait for the listener to start listening. Hence the rospy.Duration(1)
                 output_pose_stamped = tf_buffer.transform(pose_stamped, to_frame, rospy.Duration(2), PoseStamped)
@@ -19,7 +19,7 @@ def tf_transform_pose(tf_buffer, input_pose, from_frame, to_frame, loop=True):
                 return output_pose_stamped
 
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                print("Waiting for box transform\n")
+                print("Cannot transform pose\n")
 
     else:
         try:
@@ -29,11 +29,11 @@ def tf_transform_pose(tf_buffer, input_pose, from_frame, to_frame, loop=True):
             return output_pose_stamped
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-            print("Waiting for box transform\n")
+            print("Cannot transform pose\n")
 
 def patient_lookup_box_tf(tf_buffer, loop=True):
     if loop:
-        while True:
+        while not rospy.is_shutdown():
             try:
                 trans = tf_buffer.lookup_transform('box_origin', 'base_link', rospy.Time(0), timeout=rospy.Duration(2))
                 return trans
