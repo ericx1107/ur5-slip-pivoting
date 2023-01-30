@@ -9,7 +9,7 @@ if __name__ == "__main__":
         
     box_dim = [0.18, 0.11, 0.04]
     
-    markers = BoxMarkers(box_dim, 1)
+    # markers = BoxMarkers(box_dim, 1)
     
     est = StateEstimator(box_dim)
     
@@ -17,5 +17,7 @@ if __name__ == "__main__":
         contact = est.vision_estimate_contact()
         
         est.estimate_contact_config(contact)
+
+        est.estimate_rotation_angle()
     
     # rospy.spin()
