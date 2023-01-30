@@ -308,7 +308,7 @@ class BoxMarkers():
             # v_offset = self.box_dim[2]/2
             return
         else:
-            print("Uncaught case for object position. No side facing up found.")
+            # print("Uncaught case for object position. No side facing up found.")
             return
 
         # correct orientation of grasp pose

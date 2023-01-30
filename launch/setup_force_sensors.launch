@@ -1,0 +1,3 @@
+<launch>
+    <node name="rq_sensor" pkg="robotiq_ft_sensor" type="rq_sensor" respawn="true"/>
+</launch>

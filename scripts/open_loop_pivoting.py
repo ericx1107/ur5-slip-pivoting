@@ -21,7 +21,7 @@ class OpenLoopPivoting():
         self.arc = ArcTrajectory(box_dim, self.ur5.arm, self.grasp_param)
         
         # self.pos_grasp_sub = rospy.Subscriber('/slip_manipulation/grasp_pose', PoseStamped, self.callback)
-        self.grasp_pub = rospy.Publisher('test_grasp', PoseStamped, queue_size=1)
+        self.grasp_pub = rospy.Publisher('pregrasp_pose', PoseStamped, queue_size=1)
 
         self.pregrasp_offset = 0.05
         
@@ -35,7 +35,7 @@ class OpenLoopPivoting():
 
 
 if __name__ == "__main__":
-    rospy.init_node('box_demo')
+    rospy.init_node('open_loop_pivoting')
     box_dim = [0.18, 0.11, 0.04]
     
     while True:
@@ -117,34 +117,3 @@ if __name__ == "__main__":
         demo.ur5.move_to_cartesian_goal(end_goal.pose)
         
         del demo
-
-
-# ur5.arm.set_pose_reference_frame('base_link')
-
-# input_pose = markers.marker_list["1"]["pose"]entation.y, 
-                                                                            # self.box_pose.orientation.z, 
-                                                                            # self.box_pose.orientation.w])
-# print(type(input_pose))
-# output_pose_stamped = ur5.tf_transform_pose(input_pose, 'camera_link', 'base_link')
-
-
-# while not rospy.is_shutdown():
-#     ur5.display_pose(output_pose_stamped)
-
-
-
-'''ee_link = ur5.arm.get_end_effector_link()
-start_pose = ur5.arm.get_current_pose(ee_link).pose
-print(start_pose)
-ur5 = UR5Moveit()
-# goal_pose = [-0.150002384447, 0.0959219176177, 0.74666077793, 
-# 0.658653290385, -0.611800540121, -0.269746822291, 0.345126924532]
-# ur5.arm.set_pose_target(goal_pose)
-start_pose.position.x += 0.1
-goal_pose = [start_pose]
-print(goal_pose)
-plan, _ = ur5.arm.compute_cartesian_path(goal_pose, 0.01, 0.0)
-# print(plan)
-# plan = ur5.arm.plan()
-raw_input('Press any button to execute')
-ur5.arm.execute(plan)'''

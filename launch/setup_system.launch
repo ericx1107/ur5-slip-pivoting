@@ -4,4 +4,5 @@
     <include file="$(find slip_manipulation)/launch/setup_gripper.launch" />
     <include file="$(find slip_manipulation)/launch/publish_d435_tf.launch" />
     <include file="$(find slip_manipulation)/launch/marker_publisher.launch" />
+    <include file="$(find slip_manipulation)/launch/setup_force_sensors.launch" />
 </launch>

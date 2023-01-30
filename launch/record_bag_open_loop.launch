@@ -1,0 +1,7 @@
+<launch>
+    <node pkg="slip_manipulation" name="open_loop_pivoting"
+    type="open_loop_pivoting" output="screen" respawn="false" />
+
+    <node pkg="rosbag" type="record" name="record_bag"
+    args="record --node=/open_loop_pivoting /slip_manipulation/marker_pose /slip_manipulation/box_visualisation /slip_manipulation/grasp_pose /slip_manipulation/is_long_edge" />
+</launch>

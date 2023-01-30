@@ -89,11 +89,11 @@ class StateEstimator():
 
         second_min_z = np.partition(z_height, 1)[1]
 
-        if min_z > 0.01:
+        if min_z > 0.02:
             print("No contact")
             return False
 
-        elif min_z < 0.01 and not np.isclose(min_z, second_min_z, atol=0.01):
+        elif min_z < 0.02 and not np.isclose(min_z, second_min_z, atol=0.01):
             print("Contact through VERTEX")
             return None
 
