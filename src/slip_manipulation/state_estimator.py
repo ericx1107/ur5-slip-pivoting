@@ -4,9 +4,9 @@ import rospy
 import tf2_ros
 import tf_conversions
 import numpy as np
-from std_msgs.msg import Float32
 from geometry_msgs.msg import Pose, Point, Quaternion
 from slip_manipulation.get_tf_helper import *
+from slip_manipulation.msg import AngleStamped
 
 class StateEstimator():
     def __init__(self, box_dim):
@@ -16,7 +16,7 @@ class StateEstimator():
         self.box_height = box_dim[2]
         
         # ros publishers and subscribers
-        self.angle_pub = rospy.Publisher('/slip_manipulation/rotation_angle', Float32, queue_size=1)
+        self.angle_pub = rospy.Publisher('/slip_manipulation/rotation_angle', AngleStamped, queue_size=1)
 
         # tf things
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
@@ -169,7 +169,13 @@ class StateEstimator():
         angle = np.arccos(np.dot(box_axis, self.upright_axis) / (np.linalg.norm(box_axis) * np.linalg.norm(self.upright_axis)))
         angle *= 180/np.pi
 
-        self.angle_pub.publish(angle)
+        angle_stamped = AngleStamped()
+        angle_stamped.header.stamp = rospy.Time.now()
+        angle_stamped.header.frame_id = "base_link"
+        
+        angle_stamped.angle = angle
+
+        self.angle_pub.publish(angle_stamped)
 
 if __name__ == "__main__":
     pass

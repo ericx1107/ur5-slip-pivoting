@@ -1,7 +1,13 @@
 <launch>
     <node pkg="slip_manipulation" name="open_loop_pivoting"
-    type="open_loop_pivoting" output="screen" respawn="false" />
+    type="open_loop_pivoting.py" output="screen" respawn="false" />
+
+    <node pkg="slip_manipulation" name="vision_estimator"
+    type="vision_estimation.py" output="screen" respawn="false" />
+
+    <node pkg="slip_manipulation" name="republish_ft_data"
+    type="republish_ft_data.py" output="screen" respawn="false" />
 
     <node pkg="rosbag" type="record" name="record_bag"
-    args="record --node=/open_loop_pivoting /slip_manipulation/marker_pose /slip_manipulation/box_visualisation /slip_manipulation/grasp_pose /slip_manipulation/is_long_edge" />
+    args="record -o /home/acrv/eric_ws/bagfiles/ --node=/open_loop_pivoting /slip_manipulation/marker_pose /slip_manipulation/box_visualisation /slip_manipulation/grasp_pose /slip_manipulation/is_long_edge" />
 </launch>

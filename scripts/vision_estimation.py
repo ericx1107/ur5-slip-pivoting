@@ -14,9 +14,9 @@ if __name__ == "__main__":
     est = StateEstimator(box_dim)
     
     while not rospy.is_shutdown():
-        contact = est.vision_estimate_contact()
+        # contact = est.vision_estimate_contact()
         
-        est.estimate_contact_config(contact)
+        # est.estimate_contact_config(contact)
 
         est.estimate_rotation_angle()
     
