@@ -1,3 +1,7 @@
 <launch>
     <node name="rq_sensor" pkg="robotiq_ft_sensor" type="rq_sensor" respawn="true"/>
+
+    <!-- for visualisation in rviz -->
+    <node pkg="tf" type="static_transform_publisher" name="ft_sensor_tf" args="0 0 0 0 0 0 /tool0 /robotiq_ft_frame_id 100"/>
+
 </launch>

@@ -3,31 +3,50 @@
 import rospy
 import numpy as np
 import copy
+import subprocess
 from geometry_msgs.msg import PoseStamped
 from moveit_msgs.msg import Constraints, OrientationConstraint
 from slip_manipulation.ur5_moveit import UR5Moveit
 from slip_manipulation.box_markers import BoxMarkers
 from slip_manipulation.sensorised_gripper import SensorisedGripper
 from slip_manipulation.arc_trajectory import ArcTrajectory
+from robotiq_ft_sensor.srv import sensor_accessor
+from papillarray_ros_v2.srv import BiasRequest
 
 class OpenLoopPivoting():
-    def __init__(self, box_dim, grasp_param):
+    def __init__(self, box_dim, grasp_param, box_weight):
         self.ur5 = UR5Moveit()
         
         self.grasp_param = grasp_param
         
         self.markers = BoxMarkers(box_dim, self.grasp_param)
         self.gripper = SensorisedGripper()
-        self.arc = ArcTrajectory(box_dim, self.ur5.arm, self.grasp_param)
+        self.arc = ArcTrajectory(box_dim, self.ur5.arm, self.grasp_param, box_weight)
         
         # self.pos_grasp_sub = rospy.Subscriber('/slip_manipulation/grasp_pose', PoseStamped, self.callback)
         self.grasp_pub = rospy.Publisher('pregrasp_pose', PoseStamped, queue_size=1)
 
         self.pregrasp_offset = 0.05
         
-        self.ee_offset = 0.16
+        self.ee_offset = 0.18
 
         self.grasp_goal = PoseStamped()
+        
+        rospy.wait_for_service('/robotiq_ft_sensor_acc', timeout=rospy.Duration(10))
+        robotiq_sensor_srv = rospy.ServiceProxy('/robotiq_ft_sensor_acc', sensor_accessor)
+        try:
+            resp1 = robotiq_sensor_srv(command_id = 8)
+        except rospy.ServiceException as exc:
+            print("Service did not process request: " + str(exc))
+            
+        # rospy.wait_for_service('/hub_0/send_bias_request', timeout=rospy.Duration(10))
+        # tactile_sensor_srv = rospy.ServiceProxy('/hub_0/send_bias_request', BiasRequest)
+        # try:
+        #     resp2 = tactile_sensor_srv()
+        #     print('response:' , resp2)
+        #     # print('zeroed tactile sensor')
+        # except rospy.ServiceException as exc:
+        #     print("Service did not process request: " + str(exc))        
 
     # def callback(self, data):
     #     self.grasp_goal = data
@@ -37,7 +56,9 @@ class OpenLoopPivoting():
 if __name__ == "__main__":
     rospy.init_node('open_loop_pivoting')
     box_dim = [0.18, 0.11, 0.04]
-    
+    # box_dim = [0.28, 0.12, 0.05]
+    # box_dim = [0.23, 0.16, 0.05]
+    box_weight = 1.276
     while True:
         # get grasp position from user
         grasp_param = raw_input("Enter grasp location parameter (-1 to 1)\n")
@@ -59,7 +80,7 @@ if __name__ == "__main__":
                 break
         
         # initialise class object
-        demo = OpenLoopPivoting(box_dim, grasp_param)
+        demo = OpenLoopPivoting(box_dim, grasp_param, box_weight)
         # wait for some topics to publish
         # rospy.sleep(10)
         
@@ -99,13 +120,18 @@ if __name__ == "__main__":
 
         # close gripper
         raw_input("press enter to close gripper")
-        demo.gripper.send_gripper_command(commandName=None, grip_width=130) # 124 for long
+        demo.gripper.send_gripper_command(commandName=None, grip_width=135) # 124 for long
+        # 135 small box
+        # 103 long box
 
 
-        cartesian_plan= demo.arc.plan_cartesian_path()
+        # cartesian_plan= demo.arc.plan_cartesian_path()
 
-        raw_input("check rviz before execute")
-        demo.ur5.arm.execute(cartesian_plan, wait=True)
+        # raw_input("check rviz before execute")
+        # demo.ur5.arm.execute(cartesian_plan, wait=True)
+        
+        raw_input("press enter to move robot")
+        demo.arc.control_robot(90)
 
         # open gripper
         raw_input("press enter to open gripper")
@@ -117,3 +143,7 @@ if __name__ == "__main__":
         demo.ur5.move_to_cartesian_goal(end_goal.pose)
         
         del demo
+        
+        bashCommand = "rosnode kill /vision_estimator"
+        process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
+        output, error = process.communicate()

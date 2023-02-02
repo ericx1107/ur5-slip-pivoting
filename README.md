@@ -35,3 +35,8 @@ catkin_make --cmake-args -DCMAKE_BUILD_TYPE=Release -DPYTHON_EXECUTABLE=/usr/bin
 roslaunch armer armer.launch config:={PATH_TO_CONFIG_YAML_FILE}
 ```
 6. For more instructions and tutorials visit [Armer documentations](https://open.qcr.ai/armer/index.html)
+
+# Command to zero FT 300 sensor
+```
+rosservice call /robotiq_ft_sensor_acc "command_id: 8"
+```
