@@ -5,6 +5,8 @@ import rospy
 import math
 import numpy as np
 import tf2_ros
+import time
+from geometry_msgs.msg import Pose, Point, Quaternion
 from slip_manipulation.get_tf_helper import *
 from std_msgs.msg import Bool
 from geometry_msgs.msg import WrenchStamped
@@ -21,7 +23,7 @@ class ArcTrajectory():
     '''
     Always pivots towards the centre of box
     '''
-    def __init__(self, box_dim, arm, grasp_param, box_weight):
+    def __init__(self, box_dim, grasp_param, box_weight):
         self.long = rospy.wait_for_message('/slip_manipulation/is_long_edge', Bool, timeout=rospy.Duration(10))
         
         if self.long.data:
@@ -34,135 +36,121 @@ class ArcTrajectory():
             shift = (1 - abs(grasp_param)) * box_dim[1]/2
             self.base_dim = box_dim[1]-shift
             self.height_dim = box_dim[0]
-            
-        self.arm = arm
 
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
         self.angle_sub = rospy.Subscriber('/slip_manipulation/rotation_angle', AngleStamped, self.angle_callback)
 
-        self.theta = 0
-        self.Fz = 0
+        self.rot_angle = 0
+        # self.Fz = 0
         self.fg = 9.8 * box_weight
-        self.phi = np.arctan(self.height_dim/self.base_dim)
+        self.box_angle = np.arctan(self.height_dim/self.base_dim)
 
-        self.angle_err = 1e6 # set large number to initialise while loop
-        self.threshold = 1e-1
+        # self.angle_err = 1e6 # set large number to initialise while loop
+        # self.threshold = 1e-1
         self.Kp = 5e-3
 
         self.z_offset = 0
-        self.x_offset = 0
+        # self.x_offset = 0
 
-    def plan_cartesian_path(self, curr_angle, goal_angle):
+    def plan_cartesian_path(self):
         # Always assuming we start from the long direction
         # z is up and down, x is the direction of "home", y is the side  
 
         waypoints = []
-        wpose = self.arm.get_current_pose().pose
-        while True:
-            try:
-                wpose = tf_transform_pose(self.tf_buffer, wpose, 'base_link', 'tool0').pose
-                break
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                print("Waiting for box transform\n")
-            
-        temp = copy.deepcopy(wpose)
-        # print(temp)
+        wpose = Pose(Point(0,0,0), Quaternion(0,0,0,1))
+        
         r = np.hypot(self.base_dim, self.height_dim)
         box_angle = math.degrees(np.arctan(self.height_dim/self.base_dim))
-        # axis_angle = self.arm.get_current_joint_values()[0]
-     
         
             # change is always positive
             # cos is always positive -> change * cos is positive -> x is positive
             # sin is always negative -> change * sin is negative -> y is negative
-        for theta in np.linspace(curr_angle + box_angle, goal_angle + box_angle, math.ceil(goal_angle - curr_angle)):
-            wpose.position.z = -(r*math.sin(math.radians(theta))) + self.height_dim
-            wpose.position.y = (temp.position.y + (self.base_dim - r*math.cos(math.radians(theta))))
+        for rot_angle in np.linspace(box_angle, 85+box_angle, 100):
+            wpose.position.z = -(r*math.sin(math.radians(rot_angle))) + self.height_dim
+            wpose.position.y = self.base_dim - r*math.cos(math.radians(rot_angle))
             
-            wpose_base = tf_transform_pose(self.tf_buffer, wpose, 'tool0', 'base_link').pose
-            waypoints.append(copy.deepcopy(wpose_base)) 
-
-        
-  
-        
-        (plan, _) = self.arm.compute_cartesian_path(
-                                        waypoints,   # waypoints to follow
-                                        0.01,        # eef_step  
-                                        0.0)         # jump_threshold  
+            wpose_base = tf_transform_pose(self.listener, wpose, 'tool0', 'base_link').pose
+            waypoints.append(copy.deepcopy(wpose_base))
      
-        # Note: We are just planning, not asking move_group to actually move the robot yet:
-        print("=========== Planning completed, Cartesian path is saved=============")
-        return plan, waypoints
+        return waypoints
 
     def angle_callback(self, data):
-        self.theta = np.radians(data.angle)
+        self.rot_angle = np.radians(data.angle)
         
     def force_pred(self):
         temp_angle = []
         for i in range(5):
             angle_stamped = rospy.wait_for_message('/slip_manipulation/rotation_angle', AngleStamped, timeout=rospy.Duration(10))
             temp_angle.append(angle_stamped.angle)
-        self.theta = np.radians(np.average(temp_angle))
-        if 0 <= self.theta and self.theta < self.phi:
-            force = -1 * self.fg * np.log(self.theta + (1 - self.phi))
-        elif self.phi <= self.theta and self.theta <= np.pi/2:
-            force = -0.25 * self.fg * (self.theta - self.phi)**3 * (self.theta - np.pi/2) * (self.theta + 11)
+        self.rot_angle = np.radians(np.average(temp_angle))
+
+        theta = np.pi/2 - self.box_angle - self.rot_angle
+        alpha = np.pi/2 - theta
+        force = self.fg * np.sin(theta) * np.cos(alpha)/2
         return force
 
-    def control_robot(self, goal_angle):
-        # _, waypoints = self.plan_cartesian_path(self.theta, goal_angle)
-        while self.angle_err > 2:
-            # temp_waypoints = []
-            # loop_length = len(waypoints) if len(waypoints) < 5 else 5
-            # for i in range(loop_length):
-            #     waypoints[0].position.z = waypoints[0].position.z + self.z_offset
-            #     waypoints[0].position.x = waypoints[0].position.x + self.x_offset
-            #     temp_waypoints.append(copy.deepcopy(waypoints[0]))
-            #     waypoints.pop(0)
-            # (plan, _) = self.arm.compute_cartesian_path(temp_waypoints, 0.01, 0.0)
+    def control_planned_arc(self, waypoints):
+        # while self.angle_err > 2:
+        # temp_waypoints = []
+        # loop_length = len(waypoints) if len(waypoints) < 5 else 5
+        # for i in range(loop_length):
+        #     waypoints[0].position.z = waypoints[0].position.z + self.z_offset
+        #     waypoints[0].position.x = waypoints[0].position.x + self.x_offset
+        #     temp_waypoints.append(copy.deepcopy(waypoints[0]))
+        #     waypoints.pop(0)
+        # (plan, _) = self.arm.compute_cartesian_path(temp_waypoints, 0.01, 0.0)
 
-            predicted_force = 7
-            temp_force = []
-            for i in range(6):
-                wrench_stamped = rospy.wait_for_message('/robotiq_ft_wrench', WrenchStamped, timeout=rospy.Duration(5)).wrench.force.z
-                temp_force.append(wrench_stamped)
-            measured_force = np.average(temp_force)
+        start_time = time.time()
 
-            err = predicted_force - measured_force
-            print("pred:", predicted_force)
-            print("meas:", measured_force)
-            print("error:", err)
-            if self.angle_err >= self.theta and self.angle_err <= 90:
-                self.z_offset = self.Kp * err
-                self.x_offset = -0.25 * self.Kp * err
-            elif self.angle_err < self.theta and self.angle_err >= 0:
-                self.z_offset = 0.25 * self.Kp_z * err
-                self.x_offset = self.Kp * err
-            else: 
-                self.z_offset = 0
-                self.x_offset = 0
-            print("Z offset: ", self.z_offset)
-            
-            plan = self.move_control_robot(self.z_offset, self.x_offset)
-            self.arm.execute(plan, wait=True)
-            
-            self.angle_err = goal_angle - self.theta
-            # upper = 9
-            # lower = 0
-            # print("meas:", measured_force)
-            # if measured_force > upper:
-            #     err = measured_force - upper
-            #     self.x_offset = self.Kp * err
-            #     print("error:", err)
-            # elif measured_force < lower:
-            #     err = lower - measured_force
-            #     self.z_offset = self.Kp * err
-            #     print("error:", err)
-            # else:
-            #     self.z_offset = 0
-        print("Pivot complete!")
+        predicted_force = self.force_pred()
+        temp_force = []
+        for i in range(6):
+            force_z = rospy.wait_for_message('/robotiq_ft_wrench', WrenchStamped, timeout=rospy.Duration(5)).wrench.force.z
+            temp_force.append(force_z)
+        measured_force = np.average(temp_force)
+
+        print('total loop time: ', time.time() - start_time)
+
+        err = predicted_force - measured_force
+        print("pred:", predicted_force)
+        print("meas:", measured_force)
+        print("error:", err)
+
+        self.z_offset = self.Kp * err
+
+        # if self.angle_err >= self.rot_angle and self.angle_err <= 90:
+        #     self.z_offset = self.Kp * err
+        #     self.x_offset = -0.25 * self.Kp * err
+        # elif self.angle_err < self.rot_angle and self.angle_err >= 0:
+        #     self.z_offset = 0.25 * self.Kp_z * err
+        #     self.x_offset = self.Kp * err
+        # else: 
+        #     self.z_offset = 0
+        #     self.x_offset = 0
+        # print("Z offset: ", self.z_offset)
+        
+        # plan = self.move_control_robot(self.z_offset, self.x_offset)
+        # self.arm.execute(plan, wait=True)
+        
+        # self.angle_err = goal_angle - self.rot_angle
+
+        # upper = 9
+        # lower = 0
+        # print("meas:", measured_force)
+        # if measured_force > upper:
+        #     err = measured_force - upper
+        #     self.x_offset = self.Kp * err
+        #     print("error:", err)
+        # elif measured_force < lower:
+        #     err = lower - measured_force
+        #     self.z_offset = self.Kp * err
+        #     print("error:", err)
+        # else:
+        #     self.z_offset = 0
+
+        # print("Pivot complete!")
         
     def move_control_robot(self, z_offset, x_offset):
         waypoints = []
