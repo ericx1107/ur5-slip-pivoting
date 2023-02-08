@@ -2,7 +2,7 @@
 
 import rospy
 import tf2_ros
-import tf_conversions
+import tf
 import numpy as np
 import copy
 from aruco_msgs.msg import MarkerArray
@@ -38,6 +38,8 @@ class BoxMarkers():
         # tf things
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
         
+        self.listener = tf.TransformListener()
+        rospy.sleep(0.3)
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
         
@@ -91,17 +93,17 @@ class BoxMarkers():
         From marker position, publish the tf frame of the centre of the box
         '''
         # box 3
-        if marker_id == 3:
-            z_offset = -self.box_dim[1]/2
-            rot_rpy = (0, 0, 0)
-        elif marker_id == 4:
-            z_offset = -self.box_dim[0]/2
-            rot_rpy = (0, np.pi/2, 0)
-        elif marker_id == 2:
+        # if marker_id == 3:
+        #     z_offset = -self.box_dim[1]/2
+        #     rot_rpy = (0, 0, 0)
+        # elif marker_id == 4:
+        #     z_offset = -self.box_dim[0]/2
+        #     rot_rpy = (0, np.pi/2, 0)
+        if marker_id == 2:
             z_offset = -self.box_dim[2]/2
             rot_rpy = (-np.pi/2, 0, np.pi)
         else:
-            print("No valid marker detected")
+            # print("No valid marker detected")
             return
             
         # # box 1
@@ -143,7 +145,7 @@ class BoxMarkers():
         t.transform.translation.x = 0
         t.transform.translation.y = 0
         t.transform.translation.z = z_offset
-        q = tf_conversions.transformations.quaternion_from_euler(*rot_rpy)
+        q = tf.transformations.quaternion_from_euler(*rot_rpy)
         t.transform.rotation.x = q[0]
         t.transform.rotation.y = q[1]
         t.transform.rotation.z = q[2]
@@ -168,7 +170,7 @@ class BoxMarkers():
         
         # trans = self.tf_buffer.lookup_transform('box_origin', 'base_link', rospy.Time(0), timeout=rospy.Duration(2))
         # print("got transform")
-        box_from_base_stamped = tf_transform_pose(self.tf_buffer, box_pose, 'box_origin', 'base_link', loop=False)
+        box_from_base_stamped = tf_transform_pose(self.listener, box_pose, 'box_origin', 'base_link', loop=False)
         
         if box_from_base_stamped is None:
             print("Waiting for box transform\n")
@@ -220,7 +222,7 @@ class BoxMarkers():
         finger_offset = 0.02 # offset from side of box to grasp position
 
         # get rotation matrix for condition check
-        orientation_rpy = np.array(tf_conversions.transformations.euler_from_quaternion([trans.transform.rotation.x, 
+        orientation_rpy = np.array(tf.transformations.euler_from_quaternion([trans.transform.rotation.x, 
                                                                                         trans.transform.rotation.y, 
                                                                                         trans.transform.rotation.z, 
                                                                                         trans.transform.rotation.w]))
@@ -229,7 +231,7 @@ class BoxMarkers():
         
         tol = 0.2 # absolute tolerance, for value that should be between -1 to 1
 
-        rot_mat = tf_conversions.transformations.euler_matrix(*orientation_rpy, axes='sxyz')[:3, :3]
+        rot_mat = tf.transformations.euler_matrix(*orientation_rpy, axes='sxyz')[:3, :3]
         # print(rot_mat)
         new_z = rot_mat[:, 2]
 
@@ -312,12 +314,12 @@ class BoxMarkers():
             return
 
         # correct orientation of grasp pose
-        grasp_ori = Quaternion(*tf_conversions.transformations.quaternion_from_matrix(grasp_rot_mat))
+        grasp_ori = Quaternion(*tf.transformations.quaternion_from_matrix(grasp_rot_mat))
         
         grasp_pose.orientation = grasp_ori
         
         # transform to base_link frame
-        grasp_pose = tf_transform_pose(self.tf_buffer, grasp_pose, 'box_origin', 'base_link', loop=True)
+        grasp_pose = tf_transform_pose(self.listener, grasp_pose, 'box_origin', 'base_link', loop=True)
         
         # return or publish poses
         self.grasp_pub.publish(grasp_pose)

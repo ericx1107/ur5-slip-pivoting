@@ -1,5 +1,5 @@
 <launch>
-    <arg name="record" default="true" />
+    <arg name="record" default="false" />
 
     <node pkg="slip_manipulation" name="open_loop_pivoting"
     type="open_loop_pivoting.py" output="screen" respawn="false" />
@@ -12,7 +12,5 @@
     if="$(arg record)" />
 
     <node pkg="slip_manipulation" name="synchronise_data"
-    type="synchronise_data.py" respawn="false" />
-
-    <node pkg="tf" type="static_transform_publisher" name="ft_sensor_tf" args="0 0 0 0 0 0 /tool0 /robotiq_ft_frame_id 100"/>
+    type="synchronise_data.py" respawn="true" />
 </launch>

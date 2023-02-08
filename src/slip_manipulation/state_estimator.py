@@ -2,7 +2,7 @@
 
 import rospy
 import tf2_ros
-import tf_conversions
+import tf
 import numpy as np
 from geometry_msgs.msg import Pose, Point, Quaternion
 from slip_manipulation.get_tf_helper import *
@@ -25,20 +25,20 @@ class StateEstimator():
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
         # initialise
-        (self.upright_axis, self.upright_idx) = self.get_upright_axis()
+        self.upright_axis = self.get_upright_axis()
         
     def estimate_contact_config(self, contact=True):
 
         trans = patient_lookup_box_tf(self.tf_buffer, loop=True)
 
         # get rotation matrix from euler angles
-        orientation_rpy = np.array(tf_conversions.transformations.euler_from_quaternion([trans.transform.rotation.x, 
+        orientation_rpy = np.array(tf.transformations.euler_from_quaternion([trans.transform.rotation.x, 
                                                                                         trans.transform.rotation.y, 
                                                                                         trans.transform.rotation.z, 
                                                                                         trans.transform.rotation.w]))
 
         # describes the axis orientations in terms of the base_link axes
-        box_rot_mat = tf_conversions.transformations.euler_matrix(*orientation_rpy, axes='sxyz')[:3, :3]
+        box_rot_mat = tf.transformations.euler_matrix(*orientation_rpy, axes='sxyz')[:3, :3]
 
         base_z_axis = [0, 0, 1]
 
@@ -109,7 +109,7 @@ class StateEstimator():
         trans = patient_lookup_box_tf(self.tf_buffer, loop=True)
 
         # get rotation matrix for condition check
-        orientation_rpy = np.array(tf_conversions.transformations.euler_from_quaternion([trans.transform.rotation.x, 
+        orientation_rpy = np.array(tf.transformations.euler_from_quaternion([trans.transform.rotation.x, 
                                                                                         trans.transform.rotation.y, 
                                                                                         trans.transform.rotation.z, 
                                                                                         trans.transform.rotation.w]))
@@ -118,7 +118,7 @@ class StateEstimator():
         
         tol = 0.2 # absolute tolerance, for value that should be between -1 to 1
 
-        rot_mat = tf_conversions.transformations.euler_matrix(*orientation_rpy, axes='sxyz')[:3, :3]
+        rot_mat = tf.transformations.euler_matrix(*orientation_rpy, axes='sxyz')[:3, :3]
         # print(rot_mat)
         new_z = rot_mat[:, 2]
 
@@ -131,14 +131,14 @@ class StateEstimator():
             # print("z axis (blue) is vertical, long side")
             z_ori_coeff = np.sign(rot_mat[2, 2])    # is the new axis pointing in the same direction as the old z axis (up)?
                                                     # 1 if same direction, -1 if opposite
-            
+            return new_z
             return (np.array([0, 0, 1]) * z_ori_coeff, 2)
 
         elif all(np.isclose(new_z, [1, 0, 0], atol=tol)) or all(np.isclose(new_z, [-1, 0, 0], atol=tol)):
             # print("x axis (red) is vertical, short side")
             z_ori_coeff = np.sign(rot_mat[0, 2])    # is the new axis pointing in the same direction as the old z axis (up)?
                                                     # 1 if same direction, -1 if opposite
-
+            return new_z
             return (np.array([1, 0, 0]) * z_ori_coeff, 0)
 
         elif all(np.isclose(new_z, [0, 1, 0], atol=tol)) or all(np.isclose(new_z, [0, -1, 0], atol=tol)):
@@ -157,15 +157,15 @@ class StateEstimator():
             return
 
         # get rotation matrix from euler angles
-        orientation_rpy = np.array(tf_conversions.transformations.euler_from_quaternion([trans.transform.rotation.x, 
+        orientation_rpy = np.array(tf.transformations.euler_from_quaternion([trans.transform.rotation.x, 
                                                                                         trans.transform.rotation.y, 
                                                                                         trans.transform.rotation.z, 
                                                                                         trans.transform.rotation.w]))
 
         # describes the axis orientations in terms of the base_link axes
-        box_rot_mat = tf_conversions.transformations.euler_matrix(*orientation_rpy, axes='sxyz')[:3, :3]
+        box_rot_mat = tf.transformations.euler_matrix(*orientation_rpy, axes='sxyz')[:3, :3]
 
-        box_axis = box_rot_mat[:, self.upright_idx]
+        box_axis = box_rot_mat[:, 2]
         angle = np.arccos(np.dot(box_axis, self.upright_axis) / (np.linalg.norm(box_axis) * np.linalg.norm(self.upright_axis)))
         angle *= 180/np.pi
 

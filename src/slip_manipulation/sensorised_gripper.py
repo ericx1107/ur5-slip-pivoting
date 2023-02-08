@@ -5,7 +5,7 @@ import rospy
 import roslib; roslib.load_manifest('robotiq_2f_gripper_control')
 from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_output  as outputMsg
 from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_input  as inputMsg
-from robotiq_ft_sensor.msg import ft_sensor
+from geometry_msgs.msg import WrenchStamped
 from papillarray_ros_v2.msg import SensorState
 import csv
 
@@ -31,10 +31,10 @@ class SensorisedGripper():
         self.tac1_sub = rospy.Subscriber('/hub_0/sensor_1', SensorState, self.sensor_callback, 1)
 
         # set up FT 300 sensor subscriber
-        self.fts_data = ft_sensor()
+        self.fts_data = WrenchStamped()
         self.fts_data_arr = [['Fx','Fy','Fz','Mx','My','Mz']]
         
-        self.fts_sub = rospy.Subscriber('/robotiq_ft_sensor', ft_sensor, self.ftSensor_callback)
+        self.fts_sub = rospy.Subscriber('/robotiq_ft_wrench', WrenchStamped, self.ftSensor_callback)
 
         # wait for subscribers to initialise and update data in class parameters
         rospy.sleep(1)
@@ -96,8 +96,8 @@ class SensorisedGripper():
 
     def ftSensor_callback(self, data):
         self.fts_data = data
-        temp = [self.fts_data.Fx, self.fts_data.Fy, self.fts_data.Fz, self.fts_data.Mx, self.fts_data.My,
-        self.fts_data.Mz]
+        temp = [self.fts_data.wrench.force.x, self.fts_data.wrench.force.y, self.fts_data.wrench.force.z, 
+                self.fts_data.wrench.torque.x, self.fts_data.wrench.torque.y, self.fts_data.wrench.torque.z]
         self.fts_data_arr.append(temp)
 
     def manual_grip(self):
