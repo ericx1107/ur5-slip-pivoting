@@ -1,0 +1,16 @@
+<launch>
+    <arg name="record" default="false" />
+
+    <node pkg="slip_manipulation" name="open_loop_pivoting_armer"
+    type="open_loop_pivoting_armer.py" output="screen" respawn="false" />
+
+    <node pkg="slip_manipulation" name="vision_estimator"
+    type="vision_estimation.py" output="screen" respawn="false" />
+
+    <node pkg="rosbag" type="record" name="record_bag"
+    args="record -o /home/acrv/eric_ws/bagfiles/wed_long --node=/open_loop_pivoting /slip_manipulation/marker_pose /slip_manipulation/box_visualisation /slip_manipulation/grasp_pose /slip_manipulation/is_long_edge /aruco_marker_publisher/result/compressed /slip_manipulation/rotation_angle" 
+    if="$(arg record)" />
+
+    <node pkg="slip_manipulation" name="synchronise_data"
+    type="synchronise_data.py" respawn="true" />
+</launch>
