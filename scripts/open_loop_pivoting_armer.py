@@ -12,6 +12,7 @@ from slip_manipulation.sensorised_gripper import SensorisedGripper
 from slip_manipulation.arc_trajectory import ArcTrajectory
 from robotiq_ft_sensor.srv import sensor_accessor
 from papillarray_ros_v2.srv import BiasRequest
+from controller_manager_msgs.srv import SwitchController
 
 class OpenLoopPivoting():
     def __init__(self, box_dim, grasp_param, box_weight):
@@ -131,17 +132,32 @@ if __name__ == "__main__":
         # raw_input("check rviz before execute")
         # demo.ur5.arm.execute(cartesian_plan, wait=True)
 
-        # begin robot arc
-        raw_input("press enter to start moving robot")
-        
-        demo.start_armer_pub.publish()
-        
-        # wait for arc to end unless timeout
+        # change controller
+        rospy.wait_for_service('/controller_manager/switch_controller', timeout=rospy.Duration(10))
+        switch_controller_srv = rospy.ServiceProxy('/controller_manager/switch_controller', SwitchController)
+        req = SwitchController()
+        req.start_controllers.append('joint_group_vel_controller')
+        req.stop_controllers.append('scaled_pos_joint_traj_controller')
         try:
-            rospy.wait_for_message('slip_manipulation/start_end_sequence', Empty, rospy.Duration(30))
-        except rospy.ROSException as e:
-            print(e)
+            resp = switch_controller_srv.call()
+        except rospy.ServiceException as exc:
+            print("Service did not process request: " + str(exc))
         
+        if resp.ok:
+            # begin robot arc
+            raw_input("press enter to start moving robot")
+            
+            demo.start_armer_pub.publish()
+            
+            # wait for arc to end unless timeout
+            try:
+                rospy.wait_for_message('slip_manipulation/start_end_sequence', Empty, rospy.Duration(30))
+            except rospy.ROSException as e:
+                print(e)
+
+        else:
+            rospy.logerr("controller fucked")
+
         # open gripper
         raw_input("press enter to open gripper")
         demo.gripper.send_gripper_command(commandName=None, grip_width=0)
