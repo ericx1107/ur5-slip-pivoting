@@ -8,11 +8,14 @@ import copy
 from geometry_msgs.msg import WrenchStamped
 from armer_msgs.msg import MoveToPoseAction, MoveToPoseGoal
 from std_msgs.msg import Empty, Float32
-from slip_manipulation.arc_trajectory import ArcTrajectory
+from slip_manipulation.arc_trajectory_armer import ArcTrajectory
 from slip_manipulation.ur5_armer import UR5Armer
 
 def callback(data, args):
     print("Starting arc trajectory")
+    
+    # input("ENTER to start")
+    
     armer = args[0]
     traj = args[1]
     end_pub = args[2]
@@ -24,20 +27,20 @@ def callback(data, args):
     
 def control_robot_armer(armer, arc, goal_angle):
     waypoints = arc.plan_cartesian_path(arc.theta, goal_angle)
-    waypoints.pop(0)
+    # waypoints.pop(0)
     arc.time = time.time()
-    while arc.angle_err > 2:
+    for waypoint in waypoints:
         # execute waypoints one at a time
         ##############################################################################
         # apply offset to waypoint
-        waypoints[0].position.z = waypoints[0].position.z + arc.z_offset
-        waypoints[0].position.x = waypoints[0].position.x + arc.x_offset
-        print(waypoints[0])
+        waypoint.position.z = waypoint.position.z + arc.z_offset
+        waypoint.position.x = waypoint.position.x + arc.x_offset
+        # print(waypoints[0])
         # move to waypoint
-        armer.armer_move_to_pose_goal(waypoints[0])
+        armer.armer_move_to_pose_goal(waypoint)
         
         # remove used waypoint
-        waypoints.pop(0)
+        # waypoints.pop(0)
         ################################################################################
         # how tf does this work
         
@@ -54,11 +57,13 @@ def control_robot_armer(armer, arc, goal_angle):
         
         predicted_force = arc.force_pred()
         
-        temp_force = []
-        for i in arc.temp_loop:
-            wrench_stamped = rospy.wait_for_message('/robotiq_ft_wrench', WrenchStamped, timeout=rospy.Duration(5)).wrench.force.z
-            temp_force.append(wrench_stamped)
-        measured_force = np.average(temp_force)
+        # temp_force = []
+        # for i in arc.temp_loop:
+        wait_time = time.time()
+        measured_force = rospy.wait_for_message('/robotiq_ft_wrench', WrenchStamped, timeout=rospy.Duration(5)).wrench.force.z
+        print(wait_time - time.time())
+            # temp_force.append(wrench_stamped)
+        # measured_force = np.average(temp_force)
         err = predicted_force - measured_force
         # print("pred:", predicted_force)
         # print("meas:", measured_force)
@@ -80,7 +85,8 @@ def control_robot_armer(armer, arc, goal_angle):
             arc.x_offset = 0
         # print("Z offset: ", arc.z_offset)
         # print("X offset: ", arc.x_offset)
-        
+        arc.z_offset = 0
+        arc.x_offset = 0
         # plan = arc.move_control_robot(arc.z_offset, arc.x_offset)
         
         arc.angle_err = goal_angle - np.degrees(arc.theta)

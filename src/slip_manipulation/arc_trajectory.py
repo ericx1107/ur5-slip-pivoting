@@ -45,19 +45,21 @@ class ArcTrajectory():
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
         self.angle_sub = rospy.Subscriber('/slip_manipulation/rotation_angle', AngleStamped, self.angle_callback)
-
+        self.angle_sub = rospy.Subscriber('/robotiq_ft_wrench', WrenchStamped, self.ft_callback)
+        
         self.arm = arm
 
         self.theta = 0
         # self.Fz = 0
-        self.fg = 9.8 * box_weight
+        self.fg = 9.8 * box_weight * 2  # scaling shenanigans
         self.box_angle = np.arctan(self.height_dim/self.base_dim)
 
         self.angle_err = 1e6 # set large number to initialise while loop
         self.threshold = 5e-1
-        self.Kp = 1e-4
-        self.Kd = 1e-4
-
+        self.Kp = 2e-4#1e-4
+        self.Kd = 5e-4
+        self.Ki = 8e-5#3e-6
+        
         self.z_offset = 0
         self.x_offset = 0
         
@@ -66,6 +68,7 @@ class ArcTrajectory():
         self.theta = 0
         self.dt = time.time()
         self.prev_err = 0
+        self.intg_err = 0
         
 
     def plan_cartesian_path(self, curr_angle, goal_angle):
@@ -81,8 +84,8 @@ class ArcTrajectory():
             # change is always positive
             # cos is always positive -> change * cos is positive -> x is positive
             # sin is always negative -> change * sin is negative -> y is negative
-        for theta in np.linspace(box_angle, box_angle + goal_angle, int(np.ceil(abs(goal_angle - curr_angle)))):
-            wpose.position.z = -(r*math.sin(math.radians(theta))) + self.height_dim
+        for theta in np.linspace(box_angle, box_angle + goal_angle, 2*int(np.ceil(abs(goal_angle - curr_angle)))):
+            wpose.position.z = -(r*math.sin(math.radians(theta))) + self.height_dim# - 0.03
             wpose.position.y = self.base_dim - r*math.cos(math.radians(theta))
             
             wpose_base = tf_transform_pose(self.listener, wpose, 'tool0', 'base_link').pose
@@ -93,17 +96,15 @@ class ArcTrajectory():
     def angle_callback(self, data):
         self.theta = np.radians(data.angle)
         
+    def ft_callback(self, data):
+        self.Fz = data.wrench.force.z
+        
     def force_pred(self):
-        temp_angle = []
-        for i in self.temp_loop:
-            angle_stamped = rospy.wait_for_message('/slip_manipulation/rotation_angle', AngleStamped, timeout=rospy.Duration(10))
-            temp_angle.append(angle_stamped.angle)
-        self.theta = np.radians(np.average(temp_angle))
-        force = 34.5/np.pi * np.arctan(-8 * (self.theta - np.pi/5)) - 10
+        # force = 20/np.pi * np.arctan(-8 * (self.theta - np.pi/5)) - 6
 
-        # theta = np.pi/2 - self.box_angle - self.theta
-        # alpha = np.pi/2 - theta
-        # force = self.fg * np.sin(theta) * np.cos(alpha)/2
+        theta = np.pi/2 - self.box_angle - self.theta
+        alpha = np.pi/2 - theta
+        force = self.fg * np.sin(theta) * np.cos(alpha)/2
         return force
 
     def control_robot(self, goal_angle):
@@ -111,44 +112,59 @@ class ArcTrajectory():
         self.time = time.time()
         while self.angle_err > 2:
             temp_waypoints = []
-            loop_length = np.arange(len(waypoints)) if len(waypoints) < 3 else np.arange(3)
-            for i in loop_length:
-                waypoints[0].position.z = waypoints[0].position.z + self.z_offset
-                waypoints[0].position.x = waypoints[0].position.x + self.x_offset
-                temp_waypoints.append(copy.deepcopy(waypoints[0]))
-                waypoints.pop(0)
-            (plan, _) = self.arm.compute_cartesian_path(temp_waypoints, 0.01, 0.0)
-            self.arm.execute(plan, wait=True)
-            predicted_force = self.force_pred()
+
+            print('z_offset: ', self.z_offset)
+            # print('x_offset: ', self.x_offset)
             
-            temp_force = []
-            for i in self.temp_loop:
-                wrench_stamped = rospy.wait_for_message('/robotiq_ft_wrench', WrenchStamped, timeout=rospy.Duration(5)).wrench.force.z
-                temp_force.append(wrench_stamped)
-            measured_force = np.average(temp_force)
+            waypoints[0].position.z = waypoints[0].position.z + self.z_offset
+            waypoints[0].position.x = waypoints[0].position.x + self.x_offset
+            temp_waypoints.append(copy.deepcopy(waypoints[0]))
+            waypoints.pop(0)
+            # print(temp_waypoints)
+            (plan, _) = self.arm.compute_cartesian_path(temp_waypoints, 0.01, 0.0)
+            execute_time = time.time()
+            self.arm.execute(plan, wait=True)
+            execute_time = time.time() - execute_time
+            # if self.z_offset < 0.05:
+            #     self.arm.execute(plan, wait=True)
+            # else:
+            #     rospy.logerr("nah")
+            # execute_time = time.time() - execute_time
+            # rospy.sleep(1.5)
+            predicted_force = self.force_pred()
+            measured_force = self.Fz
+
             err = predicted_force - measured_force
             # print("pred:", predicted_force)
             # print("meas:", measured_force)
             # print("error:", err)
-            self.dt = time.time() - self.time
+            self.dt = execute_time
+            # print('dt: ', self.dt)
             deriv_err = (err - self.prev_err) / self.dt 
+            self.intg_err += err * self.dt
+            # print("error:", err)
+            # print("deriv error:", deriv_err)
+            # print("intg error:", self.intg_err)
             
             # Error is positive when the robot is pushing too much, therefore the robot should raise its arm to reduce the force
             if err > self.threshold:
-                self.z_offset = ((self.Kp * err) + (self.Kd * deriv_err)) * math.sin(self.theta)
-                self.x_offset = ((self.Kp * err) + (self.Kd * deriv_err)) * math.cos(self.theta) * np.sign(self.grasp_param)
+                # pass
+                self.z_offset += ((self.Kp * err)) + (self.Ki * self.intg_err)
+                # self.z_offset = ((self.Kp * err) + (self.Kd * deriv_err) + (self.Ki * self.intg_err)) * scale * abs(math.cos(2 * self.theta))
+                # self.x_offset = ((self.Kp * err) + (self.Kd * deriv_err) + (self.Ki * self.intg_err)) * scale * math.sin(self.theta) * -np.sign(self.grasp_param)
             # Error is negative when the robot is lifting too much, therefore the robot should lower its arm to increase the force
             elif err < -self.threshold:
-                self.z_offset = ((self.Kp * err) + (self.Kd * deriv_err)) * math.sin(self.theta)
-                self.x_offset = ((self.Kp * err) + (self.Kd * deriv_err)) * math.cos(self.theta) * -np.sign(self.grasp_param)
+                # pass
+                self.z_offset += (self.Kp * err) + (self.Ki * self.intg_err)
+                # self.z_offset = ((self.Kp * err) + (self.Kd * deriv_err) + (self.Ki * self.intg_err)) * scale * abs(math.cos(2 * self.theta))
+                # self.x_offset = ((self.Kp * err) + (self.Kd * deriv_err) + (self.Ki * self.intg_err)) * scale * math.sin(self.theta) * np.sign(self.grasp_param)
             # Do nothing
             else: 
-                self.z_offset = 0
-                self.x_offset = 0
+                pass
+
             # print("Z offset: ", self.z_offset)
             # print("X offset: ", self.x_offset)
-            
-            # plan = self.move_control_robot(self.z_offset, self.x_offset)
+
             
             self.angle_err = goal_angle - np.degrees(self.theta)
             self.time = time.time()
@@ -156,32 +172,9 @@ class ArcTrajectory():
             
             # print("Angle error: ", self.angle_err)
             
-            # for waypoint in waypoints:
-            #     waypoint.position.z += self.z_offset
-            #     waypoint.position.x += self.x_offset
-            # upper = 9
-            # lower = 0
-            # print("meas:", measured_force)
-            # if measured_force > upper:
-            #     err = measured_force - upper
-            #     self.x_offset = self.Kp * err
-            #     print("error:", err)
-            # elif measured_force < lower:
-            #     err = lower - measured_force
-            #     self.z_offset = self.Kp * err
-            #     print("error:", err)
-            # else:
-            #     self.z_offset = 0
         print("Pivot complete!")
         
 
 
 if __name__ == "__main__":
     pass
-    # tutorial = MoveGroupInteface()
-
-    # cartesian_plan= tutorial.prepare()
-
-    # raw_input("check rviz before execute")
-    # tutorial.execute_plan(cartesian_plan)
-

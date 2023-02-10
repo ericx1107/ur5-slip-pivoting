@@ -1,2 +1,0 @@
-Header header
-robotiq_ft_sensor/ft_sensor ft_data

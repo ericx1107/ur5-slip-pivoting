@@ -219,7 +219,7 @@ class BoxMarkers():
         grasp_pose.orientation.z = 0
         grasp_pose.orientation.w = 1
 
-        finger_offset = 0.02 # offset from side of box to grasp position
+        finger_offset = 0.008 # offset from side of box to grasp position
 
         # get rotation matrix for condition check
         orientation_rpy = np.array(tf.transformations.euler_from_quaternion([trans.transform.rotation.x, 

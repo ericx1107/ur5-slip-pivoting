@@ -82,7 +82,12 @@ rosservice call /robotiq_ft_sensor_acc "command_id: 8"
 # controller
 moveit: scaled_pos_joint_traj_controller?
 armer: joint_group_vel_controller?
-https://github.com/UniversalRobots/Universal_Robots_ROS_Driver/issues/117
-http://wiki.ros.org/controller_manager
-https://github.com/UniversalRobots/Universal_Robots_ROS_Driver/issues/102
-https://answers.ros.org/question/200777/using-both-jointtrajectorycontroller-and-jointpositioncontroller-at-same-time-in-ros_control/
+https://github.com/UniversalRobots/Universal_Robots_ROS_Driver/issues/117  
+http://wiki.ros.org/controller_manager  
+https://github.com/UniversalRobots/Universal_Robots_ROS_Driver/issues/102  
+https://answers.ros.org/question/200777/using-both-jointtrajectorycontroller-and-jointpositioncontroller-at-same-time-in-ros_control/  
+
+# box arc
+- arc trajectory movement affects the force on the wrist sensor while moving
+- an offsetting movement causes a spike in force (about 2 seconds to return to steady state once stopped)
+- increasing z in arc also causes high positive force (causing next waypoint to have big error and go very negative)

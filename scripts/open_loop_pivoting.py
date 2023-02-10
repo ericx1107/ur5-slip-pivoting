@@ -39,14 +39,14 @@ class OpenLoopPivoting():
         except rospy.ServiceException as exc:
             print("Service did not process request: " + str(exc))
             
-        rospy.wait_for_service('/hub_0/send_bias_request', timeout=rospy.Duration(10))
-        tactile_sensor_srv = rospy.ServiceProxy('/hub_0/send_bias_request', BiasRequest)
-        try:
-            resp2 = tactile_sensor_srv()
-            print('response:' , resp2)
-            # print('zeroed tactile sensor')
-        except rospy.ServiceException as exc:
-            print("Service did not process request: " + str(exc))        
+        # rospy.wait_for_service('/hub_0/send_bias_request', timeout=rospy.Duration(10))
+        # tactile_sensor_srv = rospy.ServiceProxy('/hub_0/send_bias_request', BiasRequest)
+        # try:
+        #     resp2 = tactile_sensor_srv()
+        #     print('response:' , resp2)
+        #     # print('zeroed tactile sensor')
+        # except rospy.ServiceException as exc:
+        #     print("Service did not process request: " + str(exc))        
 
     # def callback(self, data):
     #     self.grasp_goal = data
@@ -55,11 +55,12 @@ class OpenLoopPivoting():
 
 if __name__ == "__main__":
     rospy.init_node('open_loop_pivoting')
-    box_dim = [0.18, 0.11, 0.04]
-    # box_dim = [0.28, 0.12, 0.05]
-    # box_dim = [0.23, 0.16, 0.05]
-    box_weight = 1.276
-    # box_weight = 0.884
+    # box_dim = [0.18, 0.11, 0.04]  # small box
+    box_dim = [0.28, 0.12, 0.05]  # long box
+    # box_dim = [0.23, 0.16, 0.05]  # square box
+    # box_weight = 1.276    # small box
+    # box_weight = 0.884    # square box
+    box_weight = 1.722    # long box
     while True:
         # get grasp position from user
         grasp_param = raw_input("Enter grasp location parameter (-1 to 1)\n")
@@ -69,10 +70,12 @@ if __name__ == "__main__":
                     grasp_param = float(grasp_param)
                 except ValueError:
                     print("Enter a number!\n")
+                    grasp_param = raw_input("Enter grasp location parameter (-1 to 1)\n")
                     continue
 
                 if not -1 <= grasp_param <= 1:
                     print("Enter a number between -1 and 1!\n")
+                    grasp_param = raw_input("Enter grasp location parameter (-1 to 1)\n")
                     continue
                 elif grasp_param == 0:
                     grasp_param += 0.0001
@@ -121,9 +124,9 @@ if __name__ == "__main__":
 
         # close gripper
         raw_input("press enter to close gripper")
-        demo.gripper.send_gripper_command(commandName=None, grip_width=135) # 124 for long # 178 for previous
-        # 135 small box
-        # 103 long box
+        demo.gripper.send_gripper_command(commandName=None, grip_width=107)
+        # 138 smallest box feb10(fri)
+        # 103 square-ish box feb10(fri)
 
 
         # cartesian_plan= demo.arc.plan_cartesian_path()

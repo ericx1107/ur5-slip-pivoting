@@ -6,12 +6,12 @@
     <arg unless="$(arg eye_on_hand)" name="namespace" value="$(arg namespace_prefix)_eye_on_base" />
 
     <!--it is possible to override the link names saved in the yaml file in case of name clashes, for example-->
-    <arg if="$(arg eye_on_hand)" name="robot_effector_frame" default="wrist_3_link" />
+    <arg if="$(arg eye_on_hand)" name="robot_effector_frame" default="tool0" />
     <arg unless="$(arg eye_on_hand)" name="robot_base_frame" default="base_link" />
     <arg name="tracking_base_frame" default="" />
     
     <arg name="inverse" default="false" />
-    <arg name="calibration_file" default="" />
+    <arg name="calibration_file" default="$(find slip_manipulation)/config/$(arg namespace).yaml" />
     
     <!--publish hand-eye calibration-->
     <group ns="$(arg namespace)">

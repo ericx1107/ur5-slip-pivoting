@@ -21,9 +21,11 @@ class UR5Armer():
         
         goal = MoveToPoseGoal()
         goal.pose_stamped = target
-        self.pose_cli.send_goal(goal)
+        goal.speed = 0.05
         result = self.pose_cli.wait_for_result()
-        print(self.pose_cli.get_goal_status_text())
-        print(self.pose_cli.get_result())
-        print(self.pose_cli.get_state())
+        self.pose_cli.send_goal(goal)
+        # result = self.pose_cli.wait_for_result()
+        # print(self.pose_cli.get_goal_status_text())
+        # print(self.pose_cli.get_result())
+        # print(self.pose_cli.get_state())
         

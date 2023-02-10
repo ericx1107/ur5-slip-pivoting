@@ -9,10 +9,10 @@ from std_msgs.msg import Empty, Float32
 from slip_manipulation.ur5_moveit import UR5Moveit
 from slip_manipulation.box_markers import BoxMarkers
 from slip_manipulation.sensorised_gripper import SensorisedGripper
-from slip_manipulation.arc_trajectory import ArcTrajectory
+from slip_manipulation.arc_trajectory_armer import ArcTrajectory
 from robotiq_ft_sensor.srv import sensor_accessor
 from papillarray_ros_v2.srv import BiasRequest
-from controller_manager_msgs.srv import SwitchController
+from controller_manager_msgs.srv import SwitchControllerRequest, SwitchController, ListControllers
 
 class OpenLoopPivoting():
     def __init__(self, box_dim, grasp_param, box_weight):
@@ -28,8 +28,6 @@ class OpenLoopPivoting():
         self.grasp_param_pub = rospy.Publisher('slip_manipulation/grasp_param', Float32, queue_size=1, latch=True)
         self.start_armer_pub = rospy.Publisher('slip_manipulation/start_armer_manipulation', Empty, queue_size=1, latch=True)
         self.grasp_pub = rospy.Publisher('pregrasp_pose', PoseStamped, queue_size=1)
-        
-        self.grasp_param_pub.publish(Float32(grasp_param))
 
         self.pregrasp_offset = 0.05
         
@@ -87,6 +85,8 @@ if __name__ == "__main__":
         # initialise class object
         demo = OpenLoopPivoting(box_dim, grasp_param, box_weight)
             
+        demo.grasp_param_pub.publish(Float32(grasp_param))
+            
         # wait for some topics to publish
         # rospy.sleep(10)
         
@@ -126,7 +126,7 @@ if __name__ == "__main__":
 
         # close gripper
         raw_input("press enter to close gripper")
-        demo.gripper.send_gripper_command(commandName=None, grip_width=130) # 124 for long
+        demo.gripper.send_gripper_command(commandName=None, grip_width=133) # 124 for long
 
 
         # raw_input("check rviz before execute")
@@ -135,13 +135,24 @@ if __name__ == "__main__":
         # change controller
         rospy.wait_for_service('/controller_manager/switch_controller', timeout=rospy.Duration(10))
         switch_controller_srv = rospy.ServiceProxy('/controller_manager/switch_controller', SwitchController)
-        req = SwitchController()
+        req = SwitchControllerRequest()
         req.start_controllers.append('joint_group_vel_controller')
         req.stop_controllers.append('scaled_pos_joint_traj_controller')
+        req.stop_controllers.append('speed_scaling_state_controller')
+        req.strictness = req.STRICT
+        req.timeout = 10
+        req.start_asap = True
+        print(req)
         try:
-            resp = switch_controller_srv.call()
+            resp = switch_controller_srv.call(req)
+            print(resp)
         except rospy.ServiceException as exc:
             print("Service did not process request: " + str(exc))
+        
+        # rospy.wait_for_service('/controller_manager/list_controllers', timeout=rospy.Duration(10))
+        # list_controller_srv = rospy.ServiceProxy('/controller_manager/list_controllers', ListControllers)
+        # resp_list = list_controller_srv.call()
+        # print(resp_list)
         
         if resp.ok:
             # begin robot arc
@@ -151,12 +162,32 @@ if __name__ == "__main__":
             
             # wait for arc to end unless timeout
             try:
-                rospy.wait_for_message('slip_manipulation/start_end_sequence', Empty, rospy.Duration(30))
+                rospy.wait_for_message('slip_manipulation/start_end_sequence', Empty, rospy.Duration(60))
+                print("Sequenced finished")
             except rospy.ROSException as e:
                 print(e)
 
         else:
             rospy.logerr("controller fucked")
+
+        print("\nENTER to switch back conrollers\n")
+
+        # change controller back
+        rospy.wait_for_service('/controller_manager/switch_controller', timeout=rospy.Duration(10))
+        switch_controller_srv = rospy.ServiceProxy('/controller_manager/switch_controller', SwitchController)
+        req = SwitchControllerRequest()
+        req.stop_controllers.append('joint_group_vel_controller')
+        req.start_controllers.append('scaled_pos_joint_traj_controller')
+        req.start_controllers.append('speed_scaling_state_controller')
+        req.strictness = req.STRICT
+        req.timeout = 10
+        req.start_asap = True
+        print(req)
+        try:
+            resp = switch_controller_srv.call(req)
+            print(resp)
+        except rospy.ServiceException as exc:
+            print("Service did not process request: " + str(exc))
 
         # open gripper
         raw_input("press enter to open gripper")
