@@ -11,6 +11,8 @@ from slip_manipulation.get_tf_helper import *
 from std_msgs.msg import Bool
 from geometry_msgs.msg import WrenchStamped
 from slip_manipulation.msg import AngleStamped
+from papillarray_ros_v2.msg import SensorState
+from slip_manipulation.sensorised_gripper import SensorisedGripper
 import time
 
 class ArcTrajectory():
@@ -45,13 +47,18 @@ class ArcTrajectory():
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
         self.angle_sub = rospy.Subscriber('/slip_manipulation/rotation_angle', AngleStamped, self.angle_callback)
-        self.angle_sub = rospy.Subscriber('/robotiq_ft_wrench', WrenchStamped, self.ft_callback)
+        self.ft_sub = rospy.Subscriber('/robotiq_ft_wrench', WrenchStamped, self.ft_callback)
+        self.tac_sub = rospy.Subscriber('/hub_0/sensor_0', SensorState, self.tac_callback)
+        # self.gripper_sub = rospy.Subscriber('/Robotiq2FGripperRobotInput', inputMsg.Robotiq2FGripper_robot_input, self.gripper_callback)
+        self.gripper = SensorisedGripper()
+        # self.gripper_pub = rospy.Publisher('/Robotiq2FGripperRobotOutput', outputMsg.Robotiq2FGripper_robot_output, queue_size=1)
         
         self.arm = arm
 
         self.theta = 0
+        self.tac_data = 0
         # self.Fz = 0
-        self.fg = 9.8 * box_weight * 2  # scaling shenanigans
+        self.fg = 9.8 * box_weight * 1.5  # scaling shenanigans
         self.box_angle = np.arctan(self.height_dim/self.base_dim)
 
         self.angle_err = 1e6 # set large number to initialise while loop
@@ -70,6 +77,9 @@ class ArcTrajectory():
         self.prev_err = 0
         self.intg_err = 0
         
+        self.slip_type = 0
+        self.pillars_in_contact = 0
+        
 
     def plan_cartesian_path(self, curr_angle, goal_angle):
         # Always assuming we start from the long direction
@@ -84,7 +94,7 @@ class ArcTrajectory():
             # change is always positive
             # cos is always positive -> change * cos is positive -> x is positive
             # sin is always negative -> change * sin is negative -> y is negative
-        for theta in np.linspace(box_angle, box_angle + goal_angle, 2*int(np.ceil(abs(goal_angle - curr_angle)))):
+        for theta in np.linspace(box_angle, box_angle + goal_angle, 2 * int(np.ceil(0.5*abs(goal_angle - curr_angle)))):
             wpose.position.z = -(r*math.sin(math.radians(theta))) + self.height_dim# - 0.03
             wpose.position.y = self.base_dim - r*math.cos(math.radians(theta))
             
@@ -99,9 +109,11 @@ class ArcTrajectory():
     def ft_callback(self, data):
         self.Fz = data.wrench.force.z
         
+    def tac_callback(self, data):
+        self.tac_data = data
+        
     def force_pred(self):
         # force = 20/np.pi * np.arctan(-8 * (self.theta - np.pi/5)) - 6
-
         theta = np.pi/2 - self.box_angle - self.theta
         alpha = np.pi/2 - theta
         force = self.fg * np.sin(theta) * np.cos(alpha)/2
@@ -110,9 +122,10 @@ class ArcTrajectory():
     def control_robot(self, goal_angle):
         waypoints = self.plan_cartesian_path(self.theta, goal_angle)
         self.time = time.time()
-        while self.angle_err > 2:
+        while self.angle_err > 1 or waypoints == []:
             temp_waypoints = []
-
+            
+            
             print('z_offset: ', self.z_offset)
             # print('x_offset: ', self.x_offset)
             
@@ -125,6 +138,7 @@ class ArcTrajectory():
             execute_time = time.time()
             self.arm.execute(plan, wait=True)
             execute_time = time.time() - execute_time
+            self.slip_control()
             # if self.z_offset < 0.05:
             #     self.arm.execute(plan, wait=True)
             # else:
@@ -135,6 +149,7 @@ class ArcTrajectory():
             measured_force = self.Fz
 
             err = predicted_force - measured_force
+            # print('error: ', err)
             # print("pred:", predicted_force)
             # print("meas:", measured_force)
             # print("error:", err)
@@ -161,7 +176,7 @@ class ArcTrajectory():
             # Do nothing
             else: 
                 pass
-
+            
             # print("Z offset: ", self.z_offset)
             # print("X offset: ", self.x_offset)
 
@@ -174,7 +189,31 @@ class ArcTrajectory():
             
         print("Pivot complete!")
         
-
+    def slip_control(self):
+        stop_tightening = 1
+        for pillar in self.tac_data.pillars:
+            if abs(pillar.dX) > 2.5 or abs(pillar.dY) > 2.5 or abs(pillar.dZ) > 2.5:
+                self.gripper.send_gripper_command(commandName = None, grip_width=self.gripper.grip_width - 1)
+                stop_tightening = 0
+                print("Loosening grip")
+            if abs(pillar.dY) > 0.1 and np.sign(pillar.dY) == -1:
+                self.slip_type += 1
+            if pillar.in_contact:
+                self.pillars_in_contact += 1
+        print(self.slip_type)
+        print(self.pillars_in_contact)
+        if self.slip_type == self.pillars_in_contact:
+            print('Translational Slip')
+            if self.gripper.grip_width  < 140 and stop_tightening:
+                self.gripper.send_gripper_command(commandName = None, grip_width=self.gripper.grip_width  + 1)
+                print('Tightening grip')
+            print(self.gripper.grip_width)
+        
+            
+        self.slip_type = 0
+        self.pillars_in_contact = 0
+        
+            
 
 if __name__ == "__main__":
     pass

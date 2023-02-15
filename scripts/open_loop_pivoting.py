@@ -39,14 +39,14 @@ class OpenLoopPivoting():
         except rospy.ServiceException as exc:
             print("Service did not process request: " + str(exc))
             
-        # rospy.wait_for_service('/hub_0/send_bias_request', timeout=rospy.Duration(10))
-        # tactile_sensor_srv = rospy.ServiceProxy('/hub_0/send_bias_request', BiasRequest)
-        # try:
-        #     resp2 = tactile_sensor_srv()
-        #     print('response:' , resp2)
-        #     # print('zeroed tactile sensor')
-        # except rospy.ServiceException as exc:
-        #     print("Service did not process request: " + str(exc))        
+        rospy.wait_for_service('/hub_0/send_bias_request', timeout=rospy.Duration(10))
+        tactile_sensor_srv = rospy.ServiceProxy('/hub_0/send_bias_request', BiasRequest)
+        try:
+            resp2 = tactile_sensor_srv()
+            print('response:' , resp2)
+            # print('zeroed tactile sensor')
+        except rospy.ServiceException as exc:
+            print("Service did not process request: " + str(exc))        
 
     # def callback(self, data):
     #     self.grasp_goal = data
@@ -56,8 +56,9 @@ class OpenLoopPivoting():
 if __name__ == "__main__":
     rospy.init_node('open_loop_pivoting')
     # box_dim = [0.18, 0.11, 0.04]  # small box
-    box_dim = [0.28, 0.12, 0.05]  # long box
     # box_dim = [0.23, 0.16, 0.05]  # square box
+    box_dim = [0.28, 0.12, 0.05]  # long box
+    
     # box_weight = 1.276    # small box
     # box_weight = 0.884    # square box
     box_weight = 1.722    # long box
@@ -124,10 +125,11 @@ if __name__ == "__main__":
 
         # close gripper
         raw_input("press enter to close gripper")
-        demo.gripper.send_gripper_command(commandName=None, grip_width=107)
+        demo.gripper.touch_object(box_dim, box_weight)
+        # demo.gripper.send_gripper_command(commandName=None, grip_width=102)
         # 138 smallest box feb10(fri)
         # 103 square-ish box feb10(fri)
-
+        # 107 long box feb13(mon)
 
         # cartesian_plan= demo.arc.plan_cartesian_path()
 
@@ -138,7 +140,7 @@ if __name__ == "__main__":
         demo.arc.control_robot(90)
 
         # open gripper
-        raw_input("press enter to open gripper")
+        # raw_input("press enter to open gripper")
         demo.gripper.send_gripper_command(commandName=None, grip_width=0)
         
         # move up
