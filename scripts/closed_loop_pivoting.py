@@ -164,7 +164,8 @@ if __name__ == "__main__":
         demo.arc.original = demo.ur5.arm.get_current_pose()
         demo.arc.grasped = True
         # pass in init_grip_width=None to disable gripper controller
-        demo.arc.control_robot(goal_angle, init_grip_width=None)
+        # demo.arc.control_robot(goal_angle, init_grip_width=None)    # force controller
+        demo.arc.vision_control_robot(goal_angle, init_grip_width=None)     # vision controller
         #########################################################################################
 
 

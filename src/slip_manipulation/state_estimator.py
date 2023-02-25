@@ -20,6 +20,7 @@ class StateEstimator():
         self.lowest_vertex_pub = rospy.Publisher('/slip_manipulation/lowest_vertex', Point, queue_size=1)
 
         # tf things
+        self.listener = tf.TransformListener()
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
@@ -82,7 +83,7 @@ class StateEstimator():
         z_height = []
         for coord in coords:
             vertex = Pose(Point(*coord), Quaternion(0, 0, 0, 1))
-            base_vertex = tf_transform_pose(self.tf_buffer, vertex, 'box_origin', 'base_link', loop=False)
+            base_vertex = tf_transform_pose(self.listener, vertex, 'box_origin', 'base_link', loop=False)
             if base_vertex is None:
                 return
             z_height.append(base_vertex.pose.position.z)
@@ -106,29 +107,32 @@ class StateEstimator():
     def vision_estimate_lowest_vertex(self):
         # init all eight vertices of the box
         coords = []
-        coords.append((self.box_dim[0]/2, self.box_dim[1]/2, self.box_dim[2]/2))
-        coords.append((self.box_dim[0]/2, self.box_dim[1]/2, -self.box_dim[2]/2))
-        coords.append((self.box_dim[0]/2, -self.box_dim[1]/2, self.box_dim[2]/2))
-        coords.append((self.box_dim[0]/2, -self.box_dim[1]/2, -self.box_dim[2]/2))
-        coords.append((-self.box_dim[0]/2, self.box_dim[1]/2, self.box_dim[2]/2))
-        coords.append((-self.box_dim[0]/2, self.box_dim[1]/2, -self.box_dim[2]/2))
-        coords.append((-self.box_dim[0]/2, -self.box_dim[1]/2, self.box_dim[2]/2))
-        coords.append((-self.box_dim[0]/2, -self.box_dim[1]/2, -self.box_dim[2]/2))
+        coords.append((self.box_dim[0]/2, self.box_dim[2]/2, self.box_dim[1]/2))
+        coords.append((self.box_dim[0]/2, self.box_dim[2]/2, -self.box_dim[1]/2))
+        coords.append((self.box_dim[0]/2, -self.box_dim[2]/2, self.box_dim[1]/2))
+        coords.append((self.box_dim[0]/2, -self.box_dim[2]/2, -self.box_dim[1]/2))
+        coords.append((-self.box_dim[0]/2, self.box_dim[2]/2, self.box_dim[1]/2))
+        coords.append((-self.box_dim[0]/2, self.box_dim[2]/2, -self.box_dim[1]/2))
+        coords.append((-self.box_dim[0]/2, -self.box_dim[2]/2, self.box_dim[1]/2))
+        coords.append((-self.box_dim[0]/2, -self.box_dim[2]/2, -self.box_dim[1]/2))
 
         z_height = []
+        vertices = []
         for coord in coords:
             # convert to base_link frame to get height from base
             vertex = Pose(Point(*coord), Quaternion(0, 0, 0, 1))
-            base_vertex = tf_transform_pose(self.tf_buffer, vertex, 'box_origin', 'base_link', loop=False)
+            base_vertex = tf_transform_pose(self.listener, vertex, 'box_origin', 'base_link', loop=False)
             if base_vertex is None:
                 rospy.logerr('No box transform')
                 return
             # save height in z dimension
             z_height.append(base_vertex.pose.position.z)
+            vertices.append(base_vertex)
         
         # find min
         min_z_idx = np.argmin(z_height)
-        lowest_vertex = base_vertex[min_z_idx].pose.position
+        # print(z_height[min_z_idx])
+        lowest_vertex = vertices[min_z_idx].pose.position
         
         # publish vertex as Point msg
         self.lowest_vertex_pub.publish(lowest_vertex)

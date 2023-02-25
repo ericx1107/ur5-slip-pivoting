@@ -46,7 +46,7 @@ class ArcTrajectory():
             self.grasp_param = grasp_param
         
         # challenge offset
-        self.base_dim += 0.05
+        # self.base_dim += 0.05
         
         self.listener = tf.TransformListener()
         self.tf_buffer = tf2_ros.Buffer()
@@ -81,8 +81,8 @@ class ArcTrajectory():
         self.Kp = 2e-4#1e-4
         self.Kd = 5e-4
         self.Ki = 8e-5#3e-6
-        self.Kp_vision = 2e-4#1e-4
-        self.Ki_vision = 8e-5#3e-6
+        self.Kp_vision = 5e-1#1e-4
+        self.Ki_vision = 1e-2#3e-6
         
         self.z_offset = 0
         self.x_offset = 0
@@ -381,20 +381,22 @@ class ArcTrajectory():
             # PI controller to minimise box position error
             # get error between ideal and measured distance from surface
             lowest_vertex = rospy.wait_for_message('/slip_manipulation/lowest_vertex', Point)
-            surface_height = 0.0    # hardcoded surface height
+            surface_height = -0.015    # hardcoded surface height
             height_err = lowest_vertex.z - surface_height
+            print("lowest z:", lowest_vertex.z)
+            print("err", height_err)
             
             # accumulate integral error, initially dt=0 so no error accumulated
             self.intg_err += height_err * self.dt
             
             # Error is positive when the robot is pushing too much, therefore the robot should raise its arm to reduce the force
-            if height_err > self.threshold:
+            if height_err > 0:
                 # pass
-                self.z_offset += ((self.Kp_vision * height_err)) + (self.Ki_vision * self.intg_err)
+                self.z_offset -= (self.Kp_vision * height_err) + (self.Ki_vision * self.intg_err)
             # Error is negative when the robot is lifting too much, therefore the robot should lower its arm to increase the force
-            elif height_err < -self.threshold:
+            elif height_err < -1e-9:
                 # pass
-                self.z_offset += (self.Kp * height_err) + (self.Ki * self.intg_err)
+                self.z_offset -= (self.Kp_vision * height_err) + (self.Ki_vision * self.intg_err)
             # Do nothing
             else: 
                 pass
@@ -403,6 +405,7 @@ class ArcTrajectory():
             self.dt = time.time()
             
             print('z_offset: ', self.z_offset)
+            print('\n')
             
             waypoints[0].position.z = waypoints[0].position.z + self.z_offset
             waypoints[0].position.x = waypoints[0].position.x + self.x_offset
