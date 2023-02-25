@@ -5,7 +5,7 @@ import numpy as np
 import copy
 import subprocess
 import time
-from geometry_msgs.msg import PoseStamped, WrenchStamped
+from geometry_msgs.msg import PoseStamped
 from moveit_msgs.msg import Constraints, OrientationConstraint
 from slip_manipulation.ur5_moveit import UR5Moveit
 from slip_manipulation.box_markers import BoxMarkers
@@ -26,8 +26,6 @@ class OpenLoopPivoting():
         
         # self.pos_grasp_sub = rospy.Subscriber('/slip_manipulation/grasp_pose', PoseStamped, self.callback)
         self.grasp_pub = rospy.Publisher('pregrasp_pose', PoseStamped, queue_size=1)
-        
-        self.ft_sub = rospy.Subscriber('/robotiq_ft_wrench', WrenchStamped, self.ft_callback)
 
         self.pregrasp_offset = 0.05
         
@@ -55,12 +53,6 @@ class OpenLoopPivoting():
     #     self.grasp_goal = data
         # self.grasp_goal.pose.position.z += self.ee_offset
 
-    def ft_callback(self, data):
-        self.Fz = data.wrench.force.z
-        self.Fy = data.wrench.force.y
-        self.Tx = data.wrench.torque.x
-        
-        self.arc.theta
 
 if __name__ == "__main__":
     rospy.init_node('open_loop_pivoting')
@@ -104,7 +96,7 @@ if __name__ == "__main__":
         demo.grasp_goal = rospy.wait_for_message('/slip_manipulation/grasp_pose', PoseStamped)
         demo.grasp_goal.pose.position.z += demo.ee_offset
         
-        # move to goal
+        # set up grasp point
         pregrasp_pose = copy.deepcopy(demo.grasp_goal)
         pregrasp_pose.pose.position.z += demo.pregrasp_offset
         
@@ -113,6 +105,7 @@ if __name__ == "__main__":
         
         # demo.markers.shutdown_detector()
         
+        # go to pre-grasp pose
         # demo.ur5.move_to_ee_goal(pregrasp_pose)
         plan, _ = demo.ur5.arm.compute_cartesian_path([pregrasp_pose.pose], # waypoints to follow
 										        0.01,       # eef_step  
@@ -144,33 +137,52 @@ if __name__ == "__main__":
 
         # close gripper
         raw_input("press enter to close gripper")
+        
+        ############################## gripper control close ####################################
+        # init_grip_width = demo.gripper.touch_object(box_dim, box_weight)
+        #########################################################################################
+        
+        #################### hard close gripper (for no gripper control) ########################
         demo.gripper.send_gripper_command(commandName='close')
+        #########################################################################################
+        
         # 138 smallest box feb10(fri)
         # 103 square-ish box feb10(fri)
         # 107 long box feb13(mon)
 
-        waypoints = demo.arc.plan_cartesian_path(0, 90)
+        # start pivot
+        raw_input("press enter to move robot")
 
-        raw_input("check rviz before execute")
+        ############################ ideal plan (for no f/t control) ############################
+        # cartesian_plan = demo.arc.plan_cartesian_path(0, 90)
+
+        # raw_input("check rviz before execute")
+        # demo.ur5.arm.execute(cartesian_plan, wait=True)
+        #########################################################################################
+
+        ############################# controller pivot ##########################################
         demo.arc.original = demo.ur5.arm.get_current_pose()
         demo.arc.grasped = True
-        
-        (plan, _) = demo.ur5.arm.compute_cartesian_path(waypoints, 0.01, 0.0)
+        # pass in init_grip_width=None to disable gripper controller
+        demo.arc.control_robot(goal_angle, init_grip_width=None)
+        #########################################################################################
 
-        demo.ur5.arm.execute(plan, wait=True)
-        print('total work ', (demo.arc.translational_work + demo.arc.rotational_work))
-        print('transalational work ', demo.arc.translational_work)
-        print('rotational work ',  demo.arc.rotational_work)
-        print('time', time.time()-start_time)
 
         # open gripper
         # raw_input("press enter to open gripper")
-        demo.gripper.send_gripper_command(commandName=None, grip_width=0)
+        demo.gripper.send_gripper_command(commandName='open')
+        
+        print('time', time.time()-start_time)
         
         # move up
         end_goal = demo.ur5.arm.get_current_pose()
         end_goal.pose.position.z += 0.03
         demo.ur5.move_to_cartesian_goal(end_goal.pose)
         
+        # remove class instance to start fresh run with initialisations
         del demo
         
+        # kill vision estimation to begin plotting
+        bashCommand = "rosnode kill /vision_estimator"
+        process = subprocess.Popen(bashCommand.split(), stdout=subprocess.PIPE)
+        output, error = process.communicate()

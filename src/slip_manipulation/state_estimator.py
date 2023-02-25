@@ -17,17 +17,16 @@ class StateEstimator():
         
         # ros publishers and subscribers
         self.angle_pub = rospy.Publisher('/slip_manipulation/rotation_angle', AngleStamped, queue_size=1)
+        self.lowest_vertex_pub = rospy.Publisher('/slip_manipulation/lowest_vertex', Point, queue_size=1)
 
         # tf things
-        self.tf_broadcaster = tf2_ros.TransformBroadcaster()
-        
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
 
         # initialise
         self.upright_axis = self.get_upright_axis()
         
-    def estimate_contact_config(self, contact=True):
+    def vision_estimate_contact_config(self, contact=True):
 
         trans = patient_lookup_box_tf(self.tf_buffer, loop=True)
 
@@ -104,6 +103,36 @@ class StateEstimator():
         else:
             return True
 
+    def vision_estimate_lowest_vertex(self):
+        # init all eight vertices of the box
+        coords = []
+        coords.append((self.box_dim[0]/2, self.box_dim[1]/2, self.box_dim[2]/2))
+        coords.append((self.box_dim[0]/2, self.box_dim[1]/2, -self.box_dim[2]/2))
+        coords.append((self.box_dim[0]/2, -self.box_dim[1]/2, self.box_dim[2]/2))
+        coords.append((self.box_dim[0]/2, -self.box_dim[1]/2, -self.box_dim[2]/2))
+        coords.append((-self.box_dim[0]/2, self.box_dim[1]/2, self.box_dim[2]/2))
+        coords.append((-self.box_dim[0]/2, self.box_dim[1]/2, -self.box_dim[2]/2))
+        coords.append((-self.box_dim[0]/2, -self.box_dim[1]/2, self.box_dim[2]/2))
+        coords.append((-self.box_dim[0]/2, -self.box_dim[1]/2, -self.box_dim[2]/2))
+
+        z_height = []
+        for coord in coords:
+            # convert to base_link frame to get height from base
+            vertex = Pose(Point(*coord), Quaternion(0, 0, 0, 1))
+            base_vertex = tf_transform_pose(self.tf_buffer, vertex, 'box_origin', 'base_link', loop=False)
+            if base_vertex is None:
+                rospy.logerr('No box transform')
+                return
+            # save height in z dimension
+            z_height.append(base_vertex.pose.position.z)
+        
+        # find min
+        min_z_idx = np.argmin(z_height)
+        lowest_vertex = base_vertex[min_z_idx].pose.position
+        
+        # publish vertex as Point msg
+        self.lowest_vertex_pub.publish(lowest_vertex)
+
     def get_upright_axis(self):
         # check upright edge using transform from base_link
         trans = patient_lookup_box_tf(self.tf_buffer, loop=True)
@@ -149,7 +178,7 @@ class StateEstimator():
             print("Uncaught case for object position. No side facing up found.")
             return
 
-    def estimate_rotation_angle(self):
+    def vision_estimate_rotation_angle(self):
         try:
             trans = self.tf_buffer.lookup_transform('box_origin', 'base_link', rospy.Time(0), timeout=rospy.Duration(2))
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):

@@ -39,9 +39,9 @@ class BoxMarkers():
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
         
         self.listener = tf.TransformListener()
-        rospy.sleep(0.3)
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
+        rospy.sleep(0.3)
         
         # parameters
         self.box_pose = Pose()
@@ -219,7 +219,7 @@ class BoxMarkers():
         grasp_pose.orientation.z = 0
         grasp_pose.orientation.w = 1
 
-        finger_offset = 0.01 # offset from side of box to grasp position
+        finger_offset = 0.011 # offset from side of box to grasp position
 
         # get rotation matrix for condition check
         orientation_rpy = np.array(tf.transformations.euler_from_quaternion([trans.transform.rotation.x, 
