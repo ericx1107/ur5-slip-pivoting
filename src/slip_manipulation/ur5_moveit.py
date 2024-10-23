@@ -25,6 +25,8 @@ class UR5Moveit():
         self.arm.set_planner_id("RRTStar") # /home/acrv/HRIGroupAdmin/example_ros_ws/src/universal_robot/ur5_moveit_config/config/ompl_planning.yaml
 
         # print(moveit_commander.RobotCommander().get_link_names())
+        # print(self.arm.get_active_joints())
+        # input('paused')
 
         self.init_planning_scene()
 
@@ -38,7 +40,7 @@ class UR5Moveit():
         # define important poses
         # self.arm.set_named_target("up") # go to up position if not already there
         self.start_pose = {
-            'shoulder_pan_joint': -np.pi/2,
+            'shoulder_pan_joint': 0,
             'shoulder_lift_joint': (-94) * np.pi/180,
             'elbow_joint': (-65) * np.pi/180,
             'wrist_1_joint': (-111) * np.pi/180,

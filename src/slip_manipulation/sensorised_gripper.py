@@ -7,6 +7,7 @@ from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_output  as ou
 from robotiq_2f_gripper_control.msg import _Robotiq2FGripper_robot_input  as inputMsg
 from geometry_msgs.msg import WrenchStamped
 from papillarray_ros_v2.msg import SensorState
+from papillarray_ros_v2.srv import BiasRequest, BiasRequestRequest
 from std_msgs.msg import Bool
 import csv
 
@@ -18,11 +19,12 @@ class SensorisedGripper():
         self.gripper_pub = rospy.Publisher('/Robotiq2FGripperRobotOutput', 
             outputMsg.Robotiq2FGripper_robot_output, queue_size=1)
 
+        # 2f85 takes gripper width inputs from 0-255 open to closed
         # max gripper width 180
         self.grip_width = 0
         self.grip_bound = 240   # gripper width that fully closes the grippers when tactile sensors are attached
         self.grip_dist = 0.074 # m
-        self.grip_inc = self.grip_bound / self.grip_dist
+        self.grip_inc = self.grip_bound / self.grip_dist    # step/m
         
         # set up tactile sensor subscribers
         self.tac0_data = SensorState()
@@ -37,6 +39,8 @@ class SensorisedGripper():
         self.tac0_contact = 0
         self.tac1_contact = 0
 
+        self.tac_bias_request = rospy.ServiceProxy('/hub_0/send_bias_request', BiasRequest)
+
         # set up FT 300 sensor subscriber
         self.fts_data = WrenchStamped()
         self.fts_data_arr = [['Fx','Fy','Fz','Mx','My','Mz']]
@@ -49,6 +53,9 @@ class SensorisedGripper():
         self.safety_bound = 20
         self.max_grip_width = 255
         self.fric_coef = 0.15
+        
+        # zero tactile sensors
+        self.zero_tactile_sensors()
 
     def send_gripper_command(self, commandName="deactivate", grip_width=None):
         '''
@@ -136,25 +143,21 @@ class SensorisedGripper():
         # wait for gripper to move
         rospy.sleep(1)
 
-    def touch_object(self, box_dim, box_weight):
-        # slowly tighten gripper until tactile sensors report contact
+    # TODO: rewrite old touch_object function and move into a box-related script
+    def touch_object(self, obj_width=None):
+        '''slowly tighten gripper until tactile sensors report contact.
+        input obj_width value (m) to give an init grip width to save time. Starts from open grip if None
+        '''
         
-        both_contact = 0
-        fg = 9.8 * box_weight
-        long = rospy.wait_for_message('/slip_manipulation/is_long_edge', Bool, timeout=rospy.Duration(10))
+        both_contact = False
         
-        if long.data:
-            # print("long is true")
-            base_dim = box_dim[0]
-            height_dim = box_dim[1]
+        if obj_width is not None:
+            init_grip_width =  self.grip_bound - int(self.grip_inc * obj_width) - self.safety_bound
         else:
-            # print("long is false")
-            base_dim = box_dim[1]
-            height_dim = box_dim[0]
-        init_ft_force = fg/2 * np.sin(np.pi/2 - np.arctan(height_dim/base_dim)) * np.cos(np.arctan(height_dim/base_dim))
+            init_grip_width = 0
         
-        init_grip_width =  self.max_grip_width - int(self.grip_inc * box_dim[2])
-        print('init grip width', init_grip_width)
+        print('init grip width: ' + str(init_grip_width))
+        raw_input('Confirm grip width')
         self.send_gripper_command(None, init_grip_width)
         rospy.sleep(2)
 
@@ -173,11 +176,30 @@ class SensorisedGripper():
             # update contact bool
             total_force = self.tac0_data.gfZ + self.tac1_data.gfZ
             print(total_force)
-            if self.tac0_data.is_contact and self.tac1_data.is_contact and self.fric_coef * total_force > init_ft_force:
-                both_contact = 1
+            if self.tac0_data.is_contact and self.tac1_data.is_contact: # and self.fric_coef * total_force > init_ft_force:
+                both_contact = True
 
         print("Grasped object.")
         return init_grip_width
+
+    def zero_tactile_sensors(self):
+        request = BiasRequestRequest()
+        threshold = 0.2
+        attempt = 0
+        state_names = ['gfX','gfY','gfZ','gtX','gtY','gtZ']
+        state_values = np.array([getattr(self.tac0_data, n) for n in state_names] + [getattr(self.tac1_data, n) for n in state_names])
+        
+        # repeat a few times until the values are generally zero
+        while not (state_values < threshold).all() and attempt < 10:
+            # print(state_values)
+            # print((state_values < threshold).all())
+            try:
+                response = self.tac_bias_request(request)
+                rospy.loginfo("Bias result: " + str(response))
+            except rospy.ServiceException as e: 
+                rospy.logerr(str(e))
+            attempt += 1
+            rospy.sleep(0.5)
 
     def save_data(self):
         with open("./src/tactile_data/scripts/fts_data.csv", "wb") as f:

@@ -46,7 +46,7 @@ class ArcTrajectory():
             self.grasp_param = grasp_param
         
         # challenge offset
-        # self.base_dim += 0.05
+        self.base_dim += 0.05
         
         self.listener = tf.TransformListener()
         self.tf_buffer = tf2_ros.Buffer()
@@ -54,10 +54,8 @@ class ArcTrajectory():
 
         self.angle_sub = rospy.Subscriber('/slip_manipulation/rotation_angle', AngleStamped, self.angle_callback)
         self.ft_sub = rospy.Subscriber('/robotiq_ft_wrench', WrenchStamped, self.ft_callback)
-        # self.tac_sub = rospy.Subscriber('/hub_0/sensor_0', SensorState, self.tac_callback)
-        # self.gripper_sub = rospy.Subscriber('/Robotiq2FGripperRobotInput', inputMsg.Robotiq2FGripper_robot_input, self.gripper_callback)
+        self.tac_sub = rospy.Subscriber('/hub_0/sensor_0', SensorState, self.tac_callback)
         self.gripper = gripper
-        # self.gripper_pub = rospy.Publisher('/Robotiq2FGripperRobotOutput', outputMsg.Robotiq2FGripper_robot_output, queue_size=1)
         
         self.goal_pub = rospy.Publisher('/scaled_pos_joint_traj_controller/follow_joint_trajectory/goal', FollowJointTrajectoryActionGoal, queue_size=1)
         
@@ -339,7 +337,7 @@ class ArcTrajectory():
     def slip_control(self, init_grip_width):
         stop_tightening = 1
         for pillar in self.tac_data.pillars:
-            if abs(pillar.dX) > 8 or abs(pillar.dY) > 5 or abs(pillar.dZ) > 5:
+            if abs(pillar.dX) > 8 or abs(pillar.dY) > 8 or abs(pillar.dZ) > 8:
                 self.gripper.send_gripper_command(commandName = None, grip_width=self.gripper.grip_width - 1)
                 stop_tightening = 0
                 print("Loosening grip")
