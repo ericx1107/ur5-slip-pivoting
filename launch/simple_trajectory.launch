@@ -1,0 +1,13 @@
+<launch>
+    <arg name="record" default="true" />
+
+    <node pkg="slip_manipulation" name="follow_simple_arc_trajectory"
+    type="follow_simple_arc_trajectory.py" output="screen" respawn="false" />
+
+    <node pkg="rosbag" type="record" name="record_bag"
+    args="record -o /home/acrv/eric_ws/bagfiles/Experiments/heavy_short_open_no_grip_with --node=/open_loop_pivoting /slip_manipulation/marker_pose /slip_manipulation/box_visualisation /slip_manipulation/grasp_pose /slip_manipulation/is_long_edge /aruco_marker_publisher/result/compressed /slip_manipulation/rotation_angle /slip_manipulation/work" 
+    if="$(arg record)" />
+
+    <!-- <node pkg="slip_manipulation" name="synchronise_data_tactile_sensor"
+    type="synchronise_data_tactile_sensor.py" output="screen" respawn="true" /> -->
+</launch>
