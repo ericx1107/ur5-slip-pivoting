@@ -1,0 +1,29 @@
+<launch>
+
+<arg name="robot_ip" default="10.0.0.2" />
+<arg name="kinematics_config" default="/home/acrv/my_robot_calibration.yaml" />
+<!-- <arg name="controllers" default="joint_state_controller scaled_pos_joint_traj_controller force_torque_sensor_controller" doc="Controllers that are activated by default."/> -->
+<!-- <arg name="stopped_controllers" default="pos_joint_traj_controller speed_scaling_state_controller joint_group_vel_controller" doc="Controllers that are initally loaded, but not started."/> -->
+  <include file="$(find ur_robot_driver)/launch/ur5_bringup.launch">
+    <arg name="robot_ip" value="$(arg robot_ip)" />
+    <arg name="kinematics_config" value="$(arg kinematics_config)" />
+    <!-- <arg name="controllers" value="$(arg controllers)" /> -->
+    <!-- <arg name="stopped_controllers" value="$(arg stopped_controllers)" /> -->
+  </include>
+
+  <include file="$(find ur5_moveit_config)/launch/moveit_planning_execution.launch" />
+  <!-- <include file="$(find ur5_moveit_config)/launch/moveit_rviz.launch" /> -->
+
+  <arg name="debug" default="false" />
+  <arg unless="$(arg debug)" name="launch_prefix" value="" />
+  <arg     if="$(arg debug)" name="launch_prefix" value="gdb --ex run --args" />
+
+  <arg name="config" default="" />
+  <arg unless="$(eval config=='')" name="command_args" value="-d $(arg config)" />
+  <arg     if="$(eval config=='')" name="command_args" value="-d $(find ur5_vistac_common)/config/moveit.rviz"/>
+
+  <node name="$(anon rviz)" launch-prefix="$(arg launch_prefix)" pkg="rviz" type="rviz" respawn="false"
+        args="$(arg command_args)" output="screen">
+  </node>
+
+</launch>

@@ -1,0 +1,10 @@
+<launch>
+    <arg name="camera_name" default="d405" doc="Name of the camera used. Either d405 or d435" />
+    
+    <include file="$(find ur5_vistac_common)/launch/setup_$(arg camera_name).launch" />
+    <include file="$(find ur5_vistac_common)/launch/setup_ur5.launch" />
+    <include file="$(find ur5_vistac_common)/launch/setup_gripper.launch" />
+    <include file="$(find ur5_vistac_common)/launch/publish_$(arg camera_name)_tf.launch" />
+    <include file="$(find ur5_vistac_common)/launch/setup_force_sensors.launch" />
+    <include file="$(find ur5_vistac_common)/launch/setup_tactile_sensors.launch" />
+</launch>
