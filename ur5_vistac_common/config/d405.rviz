@@ -6,6 +6,8 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /Camera1
+        - /Camera1/Status1
         - /PointCloud21
       Splitter Ratio: 0.5
     Tree Height: 355
@@ -56,7 +58,7 @@ Visualization Manager:
     - Class: rviz/Camera
       Enabled: true
       Image Rendering: background and overlay
-      Image Topic: /camera/color/image_raw
+      Image Topic: /d405/color/image_raw
       Name: Camera
       Overlay Alpha: 0.5
       Queue Size: 2
@@ -91,7 +93,7 @@ Visualization Manager:
       Size (Pixels): 3
       Size (m): 0.0010000000474974513
       Style: Flat Squares
-      Topic: /camera/depth/color/points
+      Topic: /d405/depth/color/points
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
@@ -100,7 +102,7 @@ Visualization Manager:
   Global Options:
     Background Color: 48; 48; 48
     Default Light: true
-    Fixed Frame: camera_link
+    Fixed Frame: d405_link
     Frame Rate: 30
   Name: root
   Tools:
@@ -139,10 +141,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7203978300094604
+      Pitch: 0.4253978729248047
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.345400333404541
+      Yaw: 2.8054003715515137
     Saved: ~
 Window Geometry:
   Camera:
@@ -163,4 +165,4 @@ Window Geometry:
     collapsed: false
   Width: 1267
   X: 67
-  Y: 90
+  Y: 60

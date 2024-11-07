@@ -6,7 +6,7 @@ import numpy as np
 import tf2_ros
 import time
 import moveit_commander
-import scipy
+from scipy import optimize
 from geometry_msgs.msg import Pose, Point, Quaternion
 from ur5_vistac_common.get_tf_helper import *
 from std_msgs.msg import Bool,Float32
@@ -100,33 +100,50 @@ class SimpleArc():
         
         waypoints = []
         
-        # consider the centre of the arc to be on the table surface
-        # find the radius as the distance to a point that is equidistant to the start and goal points,
-        # constrained to be on the plane z=0 (on the table)
         s = np.array([start_pose.position.x, start_pose.position.y, start_pose.position.z])
         g = np.array([goal_pose.position.x, goal_pose.position.y, goal_pose.position.z])
         
-        distance_func = lambda p: [
-            np.sqrt((p[0] - s[0])**2 + (p[1] - s[1])**2 + s[2]**2) - 
-            np.sqrt((p[0] - g[0])**2 + (p[1] - g[1])**2 + g[2]**2)
-        ]
-
-        initial_guess = [(s[0] + g[0]) / 2, (s[1] + g[1]) / 2]
-
-        c = scipy.optimize.fsolve(distance_func, initial_guess)
         
-        # calculate the radius of the arc as the distance between the centre and the start or goal point
-        radius = np.sqrt((c[0] - s[0])**2 + (c[1] - s[1])**2 + s[2]**2)
+        ############################################
+        # # consider the centre of the arc to be on the table surface
+        # # find the radius as the distance to a point that is equidistant to the start and goal points,
+        # # constrained to be on the plane z=0 (on the table)
+        # distance_func = lambda p: [
+        #     np.sqrt((p[0] - s[0])**2 + (p[1] - s[1])**2 + s[2]**2) - 
+        #     np.sqrt((p[0] - g[0])**2 + (p[1] - g[1])**2 + g[2]**2),
+        #     np.sqrt((p[0] - s[0])**2 + (p[1] - s[1])**2 + s[2]**2) - 
+        #     np.sqrt((p[0] - g[0])**2 + (p[1] - g[1])**2 + g[2]**2)
+        # ]
+        # initial_guess = [(s[0] + g[0]) / 2, (s[1] + g[1]) / 2]
+        # c = optimize.fsolve(distance_func, initial_guess)
+        # # calculate the radius of the arc as the distance between the centre and the start or goal point
+        # radius = np.sqrt((c[0] - s[0])**2 + (c[1] - s[1])**2 + s[2]**2)
+        # print(initial_guess)
+        # print(c)
+        # print(radius)
+        # # calculate the start and the end angles for the given poses
+        # start_angle = np.arcsin(s[2] / radius)  # opposite / hypotenuse
+        # end_angle = np.arcsin(g[2] / radius)        # this is wrong, should be angle against same axis as start angle
+        #############################################
         
-        # calculate the start and the end angles for the given poses
-        start_angle = np.arcsin(s[2] / radius)  # opposite / hypotenuse
-        end_angle = np.arcsin(g[2] / radius)        
+        #############################################
+        # consider the centre of the arc to the the midpoint between the start and goal points
+        c = s + (g - s)/2
+        print("c: ")
+        print(c)
+        # radius is half of the distance between the start and goal points
+        radius = np.sqrt((g[0] - s[0])**2 + (g[1] - s[1])**2 + (g[2] - s[2])**2) / 2
+        # calculate the start and the end angles from the midpoint
+        start_angle = np.pi - np.arcsin((s[2] - c[2]) / radius)  # opposite / hypotenuse; also negative side of y-axis
+        end_angle = np.arcsin((g[2] - c[2]) / radius)        
+
 
         # compute the intermediate waypoints between the start and end poses
         waypoint_pose = copy.deepcopy(start_pose)
-        for theta in np.linspace(start_angle, end_angle, num_waypoints):
-            waypoint_pose.position.z = s[2] + radius * np.sin(theta)
-            waypoint_pose.position.y = s[1] + radius * np.cos(theta)
+        for theta in np.linspace(start_angle, end_angle, num_waypoints):                # TODO: start and end points are confused
+            waypoint_pose.position.z = c[2] + radius * np.sin(theta)
+            waypoint_pose.position.y = c[1] + radius * np.cos(theta)
+            waypoint_pose.position.x = s[0] + radius * (g[0]-s[0])/num_waypoints
             
             # wpose_base = tf_transform_pose(self.listener, waypoint_pose, 'tool0', 'base_link').pose
             waypoints.append(copy.deepcopy(waypoint_pose))

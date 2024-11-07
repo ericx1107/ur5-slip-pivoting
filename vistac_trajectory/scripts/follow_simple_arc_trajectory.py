@@ -84,27 +84,30 @@ if __name__ == "__main__":
         
         # generate random points for the start and goal positions, with fixed orientation pointing down
         # TODO add actual bounds
-        start_bounds = [[0, 0, 0], [0, 0, 0]]   # lower bound for xyz, upper bound for xyz
-        goal_bounds = [[0, 0, 0], [0, 0, 0]]   # lower bound for xyz, upper bound for xyz
+        start_bounds = [[-0.60, -0.40, 0.25], [-0.40, -0.20, 0.50]]   # lower bound for xyz, upper bound for xyz
+        goal_bounds = [[-0.60, 0.20, 0.25], [-0.40, 0.40, 0.50]]   # lower bound for xyz, upper bound for xyz
         s_point = (np.random.uniform(start_bounds[0][0], start_bounds[1][0]), 
                    np.random.uniform(start_bounds[0][1], start_bounds[1][1]),
                    np.random.uniform(start_bounds[0][2], start_bounds[1][2]))
         g_point = (np.random.uniform(goal_bounds[0][0], goal_bounds[1][0]), 
                    np.random.uniform(goal_bounds[0][1], goal_bounds[1][1]),
                    np.random.uniform(goal_bounds[0][2], goal_bounds[1][2]))
-        start_pose = Pose(Point(s_point), Quaternion(0,0,0,1))
-        goal_pose = Pose(Point(g_point), Quaternion(0,0,0,1))
+        start_pose = Pose(Point(*s_point), Quaternion(-1,0,0,0))
+        goal_pose = Pose(Point(*g_point), Quaternion(-1,0,0,0))
 
         # move to the start pose (beginning of the arc)
         print("planning to starting pose")
+        
+        print("Start point: " + str(s_point))
+        print("Goal point: " + str(g_point))
         
         plan, _ = demo.ur5.arm.compute_cartesian_path([start_pose], # waypoints to follow
 										        0.01,       # eef_step  
 										        0.0)        # jump_threshold  
         
-        raw_input('Check Rviz for cartesian plan, press enter to execute')
-        print("Start timing")
-        start_time = time.time()
+        
+        
+        raw_input('\nCheck Rviz for cartesian plan of the trajectory, press enter to execute')
         
         demo.ur5.arm.execute(plan, wait=True)
         
@@ -141,6 +144,10 @@ if __name__ == "__main__":
         (plan, _) = demo.ur5.arm.compute_cartesian_path(waypoints, 0.01, 0.0)
 
         raw_input("check rviz before execute")
+        
+        print("Start timing")
+        start_time = time.time()
+        
         # demo.ft_record = True
         demo.ur5.arm.execute(plan, wait=True)
         

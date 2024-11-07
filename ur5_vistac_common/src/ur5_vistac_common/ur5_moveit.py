@@ -6,7 +6,7 @@ import numpy as np
 import roslib; roslib.load_manifest('robotiq_2f_gripper_control')
 from geometry_msgs.msg import PoseStamped
 from moveit_msgs.msg import Constraints, JointConstraint
-from slip_manipulation.get_tf_helper import *
+from ur5_vistac_common.get_tf_helper import *
 from moveit_msgs.srv import GetCartesianPath, GetCartesianPathRequest
 from moveit_msgs.msg import MoveItErrorCodes
 

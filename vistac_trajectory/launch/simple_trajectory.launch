@@ -1,7 +1,7 @@
 <launch>
     <arg name="record" default="true" />
 
-    <node pkg="slip_manipulation" name="follow_simple_arc_trajectory"
+    <node pkg="vistac_trajectory" name="follow_simple_arc_trajectory"
     type="follow_simple_arc_trajectory.py" output="screen" respawn="false" />
 
     <node pkg="rosbag" type="record" name="record_bag"
