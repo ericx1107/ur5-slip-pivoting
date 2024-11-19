@@ -83,13 +83,13 @@ def patient_lookup_tf(tf_buffer, target_frame, loop=True):
                 trans = tf_buffer.lookup_transform(target_frame, 'base_link', rospy.Time(0), timeout=rospy.Duration(2))
                 return trans
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                print("Waiting for box transform\n")
+                print("Waiting for transform\n")
     else:
             try:
                 trans = tf_buffer.lookup_transform(target_frame, 'base_link', rospy.Time(0), timeout=rospy.Duration(2))
                 return trans
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-                print("Waiting for box transform\n")
+                print("Waiting for transform\n")
 
 
                 

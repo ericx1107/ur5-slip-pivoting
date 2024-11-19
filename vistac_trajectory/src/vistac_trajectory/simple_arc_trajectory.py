@@ -208,22 +208,22 @@ class SimpleArc():
         self.Fy = data.wrench.force.y
         self.Tx = data.wrench.torque.x
         
-        trans = patient_lookup_tf(self.tf_buffer, 'tool0')
+        # trans = patient_lookup_tf(self.tf_buffer, 'tool0')
         
-        if self.grasped:
-            # print("Fz is ", self.Fz)
-            # print("Distance change is ", abs(trans.transform.translation.z - self.original.pose.position.z))
-            self.translational_work  += abs(self.Fz * abs(trans.transform.translation.z - self.original.pose.position.z))
-            self.translational_work  += abs(self.Fy * abs(trans.transform.translation.y - self.original.pose.position.y))
+        # if self.grasped:
+        #     # print("Fz is ", self.Fz)
+        #     # print("Distance change is ", abs(trans.transform.translation.z - self.original.pose.position.z))
+        #     self.translational_work  += abs(self.Fz * abs(trans.transform.translation.z - self.original.pose.position.z))
+        #     self.translational_work  += abs(self.Fy * abs(trans.transform.translation.y - self.original.pose.position.y))
             
-            self.original.pose.position.z = trans.transform.translation.z 
-            self.original.pose.position.y = trans.transform.translation.y
+        #     self.original.pose.position.z = trans.transform.translation.z 
+        #     self.original.pose.position.y = trans.transform.translation.y
         
         
-            angle_diff = abs(self.theta - self.prev_angle) 
-            self.prev_angle = self.theta
+        #     angle_diff = abs(self.theta - self.prev_angle) 
+        #     self.prev_angle = self.theta
             
-            self.rotational_work += abs((angle_diff) * self.Tx)
+        #     self.rotational_work += abs((angle_diff) * self.Tx)
         
         
         
@@ -231,8 +231,6 @@ class SimpleArc():
     def tac_callback(self, data):
         self.tac_data = data
         
-        if self.init_grip_width is not None:
-            self.slip_control(self.init_grip_width)
         
     # def force_pred(self):
     #     # force = 20/np.pi * np.arctan(-8 * (self.theta - np.pi/5)) - 6

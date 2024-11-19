@@ -46,7 +46,7 @@ class UR5Moveit():
             'elbow_joint': (-65) * np.pi/180,
             'wrist_1_joint': (-111) * np.pi/180,
             'wrist_2_joint': np.pi/2,
-            'wrist_3_joint': np.pi/2
+            'wrist_3_joint': -np.pi/2
         }
 
         # move to start pose
