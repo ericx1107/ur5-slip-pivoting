@@ -15,7 +15,7 @@ class SensorisedGripper():
     '''Robotiq 2f85 gripper, with Robotiq FT300 force/torque sensor on the wrist,
     and Contactile Papillarrays on the fingertips
     '''
-    def __init__(self):
+    def __init__(self, init_zero_tac=True):
         # set up gripper subscriber and publisher
         self.gripper_sub = rospy.Subscriber('/Robotiq2FGripperRobotInput', 
             inputMsg.Robotiq2FGripper_robot_input, self.gripper_callback)
@@ -58,7 +58,8 @@ class SensorisedGripper():
         self.fric_coef = 0.15
         
         # zero tactile sensors
-        self.zero_tactile_sensors()
+        if init_zero_tac:
+            self.zero_tactile_sensors()
 
     def send_gripper_command(self, commandName="deactivate", grip_width=None):
         '''
@@ -153,6 +154,7 @@ class SensorisedGripper():
         '''
         
         both_contact = False
+        force_threshold = 5
         
         if obj_width is not None:
             init_grip_width =  self.grip_bound - int(self.grip_inc * obj_width) - self.safety_bound
@@ -179,8 +181,14 @@ class SensorisedGripper():
             # update contact bool
             total_force = self.tac0_data.gfZ + self.tac1_data.gfZ
             print(total_force)
-            if self.tac0_data.is_contact and self.tac1_data.is_contact: # and self.fric_coef * total_force > init_ft_force:
+            
+            # both exceed force threshold conditon
+            if (self.tac0_data.gfZ > force_threshold) and (self.tac1_data.gfZ > force_threshold):
                 both_contact = True
+            
+            # both contact condition
+            # if self.tac0_data.is_contact and self.tac1_data.is_contact: # and self.fric_coef * total_force > init_ft_force:
+                # both_contact = True
 
         print("Grasped object.")
         return init_grip_width

@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from matplotlib.lines import Line2D
 from slip_manipulation.msg import AngleStamped
-from geometry_msgs.msg import WrenchStamped
+from geometry_msgs.msg import WrenchStamped, PoseStamped
 from papillarray_ros_v2.msg import SensorState
 from sensor_msgs import Image, CompressedImage
 import time
@@ -60,14 +60,15 @@ class SyncData():
       os.makedirs(self.exp_dir / dir)
 
     # subscribers
-    self.wrench_sub = message_filters.Subscriber('/robotiq_ft_wrench', WrenchStamped)
-    self.tac0_sub = message_filters.Subscriber('/hub_0/sensor_0', SensorState)
+    self.wrench_sub = message_filters.Subscriber('/robotiq_ft_wrench', WrenchStamped) # 60hz
+    self.tac0_sub = message_filters.Subscriber('/hub_0/sensor_0', SensorState)  # 500hz
     self.tac1_sub = message_filters.Subscriber('/hub_0/sensor_1', SensorState)
-    self.hand_cam_rgb_sub = message_filters.Subscriber('/d405/color/image_raw', Image)
+    self.hand_cam_rgb_sub = message_filters.Subscriber('/d405/color/image_raw', Image)  # 60hz
     # self.hand_cam_rgb_sub = message_filters.Subscriber('/d405/color/image_raw/compressed', CompressedImage)
-    self.hand_cam_depth_sub = message_filters.Subscriber('/d405/depth/image_rect_raw', Image)
+    self.hand_cam_depth_sub = message_filters.Subscriber('/d405/depth/image_rect_raw', Image) # 60hz
     # self.hand_cam_depth_sub = message_filters.Subscriber('/d405/depth/image_rect_raw/compressed', CompressedImage)
-    self.side_cam_rgb_sub = message_filters.Subscriber('/d435/color/image_raw', Image)
+    self.side_cam_rgb_sub = message_filters.Subscriber('/d435/color/image_raw', Image)  # 60hz
+    self.mocap_obj_sub = message_filters.Subscriber('', PoseStamped)
 
     self.ts = message_filters.ApproximateTimeSynchronizer(
       [self.wrench_sub,

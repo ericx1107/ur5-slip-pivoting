@@ -18,7 +18,7 @@ class FollowSimpleTrajectory():
     def __init__(self):
         self.ur5 = UR5Moveit()
 
-        self.gripper = SensorisedGripper()
+        self.gripper = SensorisedGripper(False)
         self.arc = SimpleArc(self.ur5, self.gripper)
         
         self.grasp_pub = rospy.Publisher('pregrasp_pose', PoseStamped, queue_size=1)
@@ -85,8 +85,8 @@ if __name__ == "__main__":
         start_quat = demo.ur5.arm.get_current_pose().pose.orientation
         
         # generate random points for the start and goal positions, with fixed orientation pointing down
-        start_bounds = [[-0.60, -0.40, 0.25], [-0.40, -0.20, 0.50]]   # lower bound for xyz, upper bound for xyz
-        goal_bounds = [[-0.60, 0.20, 0.25], [-0.40, 0.40, 0.50]]   # lower bound for xyz, upper bound for xyz
+        start_bounds = [[-0.60, -0.55, 0.25], [-0.40, -0.35, 0.50]]   # lower bound for xyz, upper bound for xyz
+        goal_bounds = [[-0.60, 0.35, 0.25], [-0.40, 0.55, 0.50]]   # lower bound for xyz, upper bound for xyz
         s_point = (np.random.uniform(start_bounds[0][0], start_bounds[1][0]), 
                    np.random.uniform(start_bounds[0][1], start_bounds[1][1]),
                    np.random.uniform(start_bounds[0][2], start_bounds[1][2]))

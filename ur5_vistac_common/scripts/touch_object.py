@@ -9,8 +9,11 @@ if __name__ == "__main__":
     
     g = SensorisedGripper()
     
+    # initial 3d print block
     # dims: 4.4cm across orthogonal to holes, 3.8cm parallel to holes, 9.6 long
     # width = 0.038
+    # roughly 103 touch
+    # roughly 115 firm
     
     width = float(raw_input("Enter width of object in m to save time:"))
     print("\n")
