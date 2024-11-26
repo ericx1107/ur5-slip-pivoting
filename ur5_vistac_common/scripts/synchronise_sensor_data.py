@@ -68,7 +68,7 @@ class SyncData():
     self.hand_cam_depth_sub = message_filters.Subscriber('/d405/depth/image_rect_raw', Image) # 60hz
     # self.hand_cam_depth_sub = message_filters.Subscriber('/d405/depth/image_rect_raw/compressed', CompressedImage)
     self.side_cam_rgb_sub = message_filters.Subscriber('/d435/color/image_raw', Image)  # 60hz
-    self.mocap_obj_sub = message_filters.Subscriber('', PoseStamped)
+    self.mocap_obj_sub = message_filters.Subscriber('/object/pose', PoseStamped)
 
     self.ts = message_filters.ApproximateTimeSynchronizer(
       [self.wrench_sub,
@@ -156,7 +156,6 @@ if __name__ == "__main__":
     # rospy.spin()
     while not rospy.is_shutdown():
       try:
-        angle = rospy.wait_for_message('/slip_manipulation/rotation_angle', AngleStamped, timeout=rospy.Duration(10))
         # print('looping')
         rospy.spin()
       except rospy.exceptions.ROSException:
