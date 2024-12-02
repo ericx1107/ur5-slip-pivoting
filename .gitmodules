@@ -1,0 +1,23 @@
+# [submodule "geometry2"]
+# 	path = geometry2
+# 	url = https://github.com/ros/geometry2.git
+[submodule "robotiq"]
+	path = robotiq
+	url = https://github.com/ros-industrial-attic/robotiq.git
+[submodule "universal_robot"]
+	path = universal_robot
+	url = https://github.com/ros-industrial/universal_robot.git
+	branch = melodic-devel
+[submodule "aruco_ros"]
+	path = aruco_ros
+	url = https://github.com/pal-robotics/aruco_ros.git
+	branch = melodic-devel
+[submodule "easy_handeye"]
+	path = easy_handeye
+	url = https://github.com/IFL-CAMP/easy_handeye.git
+[submodule "realsense-ros-d405"]
+	path = realsense-ros-d405
+	url = https://github.com/rjwb1/realsense-ros.git
+[submodule "Universal_Robots_ROS_Driver"]
+	path = Universal_Robots_ROS_Driver
+	url = ./Universal_Robots_ROS_Driver/
