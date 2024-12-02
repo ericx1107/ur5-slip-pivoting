@@ -40,12 +40,21 @@ class UR5Moveit():
 
         # define important poses
         # self.arm.set_named_target("up") # go to up position if not already there
-        self.start_pose = {
+        # self.start_pose = { # pointing away from window towards whiteboard
+        #     'shoulder_pan_joint': 0,
+        #     'shoulder_lift_joint': (-94) * np.pi/180,
+        #     'elbow_joint': (-65) * np.pi/180,
+        #     'wrist_1_joint': (-111) * np.pi/180,
+        #     'wrist_2_joint': np.pi/2,
+        #     'wrist_3_joint': -np.pi/2
+        # }
+
+        self.start_pose = { # pointing towards window
             'shoulder_pan_joint': 0,
-            'shoulder_lift_joint': (-94) * np.pi/180,
-            'elbow_joint': (-65) * np.pi/180,
-            'wrist_1_joint': (-111) * np.pi/180,
-            'wrist_2_joint': np.pi/2,
+            'shoulder_lift_joint': (-86) * np.pi/180,
+            'elbow_joint': (65) * np.pi/180,
+            'wrist_1_joint': (-69) * np.pi/180,
+            'wrist_2_joint': -np.pi/2,
             'wrist_3_joint': -np.pi/2
         }
 
@@ -61,6 +70,20 @@ class UR5Moveit():
         box_pose.pose.position.z = box_pose.pose.position.z - .44 # shift by table size/2
         box_name = "table"
         self.scene.add_box(box_name, box_pose, size=self.table_size)
+        
+        # add cameras collision objects
+        cam1_pose = PoseStamped()
+        cam1_pose.header.frame_id = "base_link"
+        cam1_pose.pose.position.x = 0.80
+        cam1_pose.pose.position.y = 0.50
+        cam1_pose.pose.position.z = .15
+        self.scene.add_box("camera_1", cam1_pose, size=[0.30, 0.30, 0.30])
+        cam2_pose = PoseStamped()
+        cam2_pose.header.frame_id = "base_link"
+        cam2_pose.pose.position.x = 0.80
+        cam2_pose.pose.position.y = -0.50
+        cam2_pose.pose.position.z = .15
+        self.scene.add_box("camera_2", cam2_pose, size=[0.30, 0.30, 0.30])
 
     def init_moveit_constraints(self):
         # clear existing constraints

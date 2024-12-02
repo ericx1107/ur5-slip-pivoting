@@ -85,8 +85,10 @@ if __name__ == "__main__":
         start_quat = demo.ur5.arm.get_current_pose().pose.orientation
         
         # generate random points for the start and goal positions, with fixed orientation pointing down
-        start_bounds = [[-0.60, -0.55, 0.25], [-0.40, -0.35, 0.50]]   # lower bound for xyz, upper bound for xyz
-        goal_bounds = [[-0.60, 0.35, 0.25], [-0.40, 0.55, 0.50]]   # lower bound for xyz, upper bound for xyz
+        # start_bounds = [[-0.60, -0.55, 0.25], [-0.40, -0.35, 0.50]]   # lower bound for xyz, upper bound for xyz
+        # goal_bounds = [[-0.60, 0.35, 0.25], [-0.40, 0.55, 0.50]]   # lower bound for xyz, upper bound for xyz
+        start_bounds = [[0.40, -0.50, 0.25], [0.60, -0.40, 0.32]]   # lower bound for xyz, upper bound for xyz
+        goal_bounds = [[0.40, 0.40, 0.25], [0.60, 0.50, 0.32]]   # lower bound for xyz, upper bound for xyz
         s_point = (np.random.uniform(start_bounds[0][0], start_bounds[1][0]), 
                    np.random.uniform(start_bounds[0][1], start_bounds[1][1]),
                    np.random.uniform(start_bounds[0][2], start_bounds[1][2]))
