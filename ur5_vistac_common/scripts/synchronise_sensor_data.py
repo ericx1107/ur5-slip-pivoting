@@ -8,8 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import os
 import cv2
-import datetime as dt
-from datetime import datetime
+from datetime import datetime, tzinfo, timedelta
 from pathlib import Path
 from matplotlib.lines import Line2D
 from slip_manipulation.msg import AngleStamped
@@ -48,8 +47,17 @@ class SyncData():
 
     # init save paths
     # make a folder for the experiment
-    t = datetime.now(dt.timezone(dt.timedelta(hours=10)))
+    class AEST(tzinfo):
+        def utcoffset(self, dt):
+            return timedelta(hours=10)
+        def tzname(self, dt):
+            return "AEST"
+        def dst(self, dt):
+            return timedelta(hours=11)
+    aest = AEST()
+    t = datetime.now(aest)
     dt_string = t.strftime("%Y_%m_%d___%H_%M_%S")
+    
     self.exp_dir = save_dir / Path(dt_string)
     os.mkdir(self.exp_dir)   # do not allow same name directories
     # make a folder for the individual modalities

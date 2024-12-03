@@ -156,7 +156,8 @@ class SensorisedGripper():
         both_contact = False
         force_threshold = 5
         
-        if obj_width is not None:
+        if obj_width:
+            obj_width = float(obj_width)
             init_grip_width =  self.grip_bound - int(self.grip_inc * obj_width) - self.safety_bound
         else:
             init_grip_width = 0

@@ -1,8 +1,15 @@
 # UR5 Slip In-Hand Pivoting
 ROS package for in-hand pivoting experiments with a UR5 robot arm. The package was created and tested on ROS melodic and Ubuntu 18.04.
 
+## Building
+
 ```bash
 git clone git@github.com:ericx1107/ur5-slip-pivoting.git slip_manipulation
+```
+
+Many required packages are written with Python2 syntax, build with Python2.7:
+```bash
+catkin_make
 ```
 
 We use slip in the gripper fingers to enable the rotation of a target box object, while using multiple data-modalities to track the state of the object. For details see [our paper](https://ieeexplore.ieee.org/abstract/document/10341505). 

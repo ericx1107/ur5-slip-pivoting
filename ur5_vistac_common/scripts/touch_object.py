@@ -15,6 +15,6 @@ if __name__ == "__main__":
     # roughly 103 touch
     # roughly 115 firm
     
-    width = float(raw_input("Enter width of object in m to save time:"))
+    width = raw_input("Enter width of object in m to save time:")
     print("\n")
     g.touch_object(obj_width=width)
