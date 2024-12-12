@@ -8,13 +8,14 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import os
 import cv2
+import cv_bridge
 from datetime import datetime, tzinfo, timedelta
 from pathlib import Path
 from matplotlib.lines import Line2D
 from slip_manipulation.msg import AngleStamped
 from geometry_msgs.msg import WrenchStamped, PoseStamped
 from papillarray_ros_v2.msg import SensorState
-from sensor_msgs import Image, CompressedImage
+from sensor_msgs.msg import Image, CompressedImage
 import time
 
 class SyncData():
@@ -44,6 +45,9 @@ class SyncData():
     self.side_cam_rgb_array = []
 
     self.time_array = []
+    self.dt_array = []
+    
+    self.bridge = cv_bridge.CvBridge()
 
     # init save paths
     # make a folder for the experiment
@@ -59,13 +63,13 @@ class SyncData():
     dt_string = t.strftime("%Y_%m_%d___%H_%M_%S")
     
     self.exp_dir = save_dir / Path(dt_string)
-    os.mkdir(self.exp_dir)   # do not allow same name directories
+    os.mkdir(str(self.exp_dir))   # do not allow same name directories
     # make a folder for the individual modalities
     self.dir_names = ['wrist_ft_force', 'wrist_ft_torque', 
             'tac0_displacement', 'tac1_displacement', 'tac0_force', 'tac1_force', 
             'in_hand_rgb', 'in_hand_depth', 'side_rgb']
     for dir in self.dir_names:
-      os.makedirs(self.exp_dir / dir)
+      os.makedirs(str(self.exp_dir / dir))
 
     # subscribers
     self.wrench_sub = message_filters.Subscriber('/robotiq_ft_wrench', WrenchStamped) # 60hz
@@ -73,10 +77,11 @@ class SyncData():
     self.tac1_sub = message_filters.Subscriber('/hub_0/sensor_1', SensorState)
     self.hand_cam_rgb_sub = message_filters.Subscriber('/d405/color/image_raw', Image)  # 60hz
     # self.hand_cam_rgb_sub = message_filters.Subscriber('/d405/color/image_raw/compressed', CompressedImage)
-    self.hand_cam_depth_sub = message_filters.Subscriber('/d405/depth/image_rect_raw', Image) # 60hz
+    # self.hand_cam_depth_sub = message_filters.Subscriber('/d405/depth/image_rect_raw', Image) # 60hz
+    self.hand_cam_depth_sub = message_filters.Subscriber('/d405/aligned_depth_to_color/image_raw', Image) # 60hz
     # self.hand_cam_depth_sub = message_filters.Subscriber('/d405/depth/image_rect_raw/compressed', CompressedImage)
     self.side_cam_rgb_sub = message_filters.Subscriber('/d435/color/image_raw', Image)  # 60hz
-    self.mocap_obj_sub = message_filters.Subscriber('/object/pose', PoseStamped)
+    self.mocap_obj_sub = message_filters.Subscriber('vrpn_client_node/RigidBody01/pose', PoseStamped)
 
     self.ts = message_filters.ApproximateTimeSynchronizer(
       [self.wrench_sub,
@@ -124,13 +129,19 @@ class SyncData():
 
     # process time stamps?
     tns = tac0.header.stamp.to_nsec()
-    self.time_array.append(tns)
-    if self.time_array:
-      print(float(tns) - float(self.time_array[-1]))
+    tms = tns * 1e-6
+    if not self.time_array:
+      self.time_array.append(tms)
+    else:
+      self.time_array.append(tms)
+      self.dt_array.append(self.time_array[-1] - self.time_array[-2])
+    
 
   def save_data(self):
     # loop through each frame
-    for i in range(len(self.ft_f_array)):
+    print("\n\nSaving data")
+    print("Total frames: {}".format(len(self.hand_cam_rgb_array)))
+    for i in range(len(self.hand_cam_rgb_array)):
       # save wrist ft
       np.save(self.exp_dir / self.dir_names[0] / str(i), self.ft_f_array[i])
       np.save(self.exp_dir / self.dir_names[1] / str(i), self.ft_t_array[i])
@@ -143,9 +154,20 @@ class SyncData():
     
       # save camera images
       # save the image as rgb or binary
-      cv2.imwrite(str(self.exp_dir / self.dir_names[6] / str(i)), self.hand_cam_rgb_array[i])
-      cv2.imwrite(str(self.exp_dir / self.dir_names[7] / str(i)), self.hand_cam_depth_array[i])
-      cv2.imwrite(str(self.exp_dir / self.dir_names[8] / str(i)), self.side_cam_rgb_array[i])
+      cv2.imwrite(str(self.exp_dir / self.dir_names[6] / (str(i) + ".png")), 
+                  cv2.cvtColor(
+                    self.bridge.imgmsg_to_cv2(self.hand_cam_rgb_array[i]), cv2.COLOR_RGB2BGR
+                    ))
+      cv2.imwrite(str(self.exp_dir / self.dir_names[7] / (str(i) + ".png")), 
+                  # cv2.cvtColor(
+                    self.bridge.imgmsg_to_cv2(self.hand_cam_depth_array[i])#, cv2.COLOR_RGB2BGR
+                    )
+      cv2.imwrite(str(self.exp_dir / self.dir_names[8] / (str(i) + ".png")), 
+                  cv2.cvtColor(
+                    self.bridge.imgmsg_to_cv2(self.side_cam_rgb_array[i]), cv2.COLOR_RGB2BGR
+                    ))
+    print("Finished save")
+    print("dt average: {0:.2f}; standard deviation: {1:.2f}".format(np.mean(self.dt_array), np.std(self.dt_array)))
 
 
   def sync_with_upsample():
@@ -157,9 +179,9 @@ if __name__ == "__main__":
     '''
     rospy.init_node("process_synced_data")
     
-    save_dir = ""
+    save_dir = "/home/acrv/trajectory_ws/data/experiments"
 
-    proc = SyncData(save_dir=save_dir, sync_slop=0.0001)
+    proc = SyncData(save_dir=save_dir, sync_slop=0.1)
 
     # rospy.spin()
     while not rospy.is_shutdown():
@@ -169,4 +191,4 @@ if __name__ == "__main__":
       except rospy.exceptions.ROSException:
         break
 
-    proc.save_data()
+    rospy.on_shutdown(proc.save_data)
