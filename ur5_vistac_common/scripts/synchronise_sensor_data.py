@@ -44,6 +44,8 @@ class SyncData():
     self.hand_cam_depth_array = []
     self.side_cam_rgb_array = []
 
+    self.pose_array = []
+
     self.time_array = []
     self.dt_array = []
     
@@ -67,7 +69,7 @@ class SyncData():
     # make a folder for the individual modalities
     self.dir_names = ['wrist_ft_force', 'wrist_ft_torque', 
             'tac0_displacement', 'tac1_displacement', 'tac0_force', 'tac1_force', 
-            'in_hand_rgb', 'in_hand_depth', 'side_rgb']
+            'in_hand_rgb', 'in_hand_depth', 'side_rgb', 'pose']
     for dir in self.dir_names:
       os.makedirs(str(self.exp_dir / dir))
 
@@ -81,16 +83,17 @@ class SyncData():
     self.hand_cam_depth_sub = message_filters.Subscriber('/d405/aligned_depth_to_color/image_raw', Image) # 60hz
     # self.hand_cam_depth_sub = message_filters.Subscriber('/d405/depth/image_rect_raw/compressed', CompressedImage)
     self.side_cam_rgb_sub = message_filters.Subscriber('/d435/color/image_raw', Image)  # 60hz
-    self.mocap_obj_sub = message_filters.Subscriber('vrpn_client_node/RigidBody01/pose', PoseStamped)
+    self.mocap_obj_sub = message_filters.Subscriber('vrpn_client_node/Scrub/pose', PoseStamped)
 
     self.ts = message_filters.ApproximateTimeSynchronizer(
       [self.wrench_sub,
        self.tac0_sub, self.tac1_sub, 
-       self.hand_cam_rgb_sub, self.hand_cam_depth_sub, self.side_cam_rgb_sub], 
+       self.hand_cam_rgb_sub, self.hand_cam_depth_sub, self.side_cam_rgb_sub,
+       self.mocap_obj_sub], 
       queue_size=10, slop=sync_slop)
     self.ts.registerCallback(self.callback)
 
-  def callback(self, ft_wrench, tac0, tac1, hand_rgb, hand_depth, side_rgb):
+  def callback(self, ft_wrench, tac0, tac1, hand_rgb, hand_depth, side_rgb, pose):
     # process wrist ft sensor forces
     self.ft_f_array.append([ft_wrench.wrench.force.x, ft_wrench.wrench.force.y, ft_wrench.wrench.force.z])
     self.ft_t_array.append([ft_wrench.wrench.torque.x, ft_wrench.wrench.torque.y, ft_wrench.wrench.torque.z])
@@ -126,6 +129,11 @@ class SyncData():
     
     # process side camera images
     self.side_cam_rgb_array.append(side_rgb)
+
+    # process object poses [posx, posy, posz, quatx, quaty, quatz, quatw] 
+    self.pose_array.append([pose.pose.position.x, pose.pose.position.y, pose.pose.position.z, 
+                            pose.pose.orientation.x, pose.pose.orientation.y, 
+                            pose.pose.orientation.z, pose.pose.orientation.w])
 
     # process time stamps?
     tns = tac0.header.stamp.to_nsec()
@@ -166,6 +174,10 @@ class SyncData():
                   cv2.cvtColor(
                     self.bridge.imgmsg_to_cv2(self.side_cam_rgb_array[i]), cv2.COLOR_RGB2BGR
                     ))
+      
+      # save object poses
+      np.save(self.exp_dir / self.dir_names[9] / str(i), self.pose_array[i])
+      
     print("Finished save")
     print("dt average: {0:.2f}; standard deviation: {1:.2f}".format(np.mean(self.dt_array), np.std(self.dt_array)))
 
