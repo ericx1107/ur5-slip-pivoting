@@ -1,0 +1,53 @@
+<launch>
+    <arg name="camera_name" default="d405" doc="Name of the camera used. Either d405 or d435" />
+    <arg name="server" default="192.168.1.2"/>
+
+    <!-- start eye-in-hand camera and tf -->
+    <include file="$(find ur5_vistac_common)/launch/setup_ur5.launch" />
+    <!-- <include file="$(find ur5_vistac_common)/launch/setup_$(arg camera_name).launch" /> -->
+    <include file="$(find ur5_vistac_common)/launch/setup_d405.launch" />
+    <!-- <include file="$(find ur5_vistac_common)/launch/setup_d435.launch" /> -->
+    <include file="$(find ur5_vistac_common)/launch/publish_$(arg camera_name)_tf.launch" />
+    <!-- <include file="$(find ur5_vistac_common)/launch/publish_d405_tf.launch" /> -->
+
+
+    <!-- start motion capture -->
+    <node pkg="vrpn_client_ros" type="vrpn_client_node" name="vrpn_client_node" output="screen" respawn="false">
+        <rosparam subst_value="true">
+        server: $(arg server)
+        port: 3883
+
+        update_frequency: 100.0
+        frame_id: world
+
+        # Use the VRPN server's time, or the client's ROS time.
+        use_server_time: false
+        broadcast_tf: true
+
+        # Must either specify refresh frequency > 0.0, or a list of trackers to create
+        refresh_tracker_frequency: 1.0
+        #trackers:
+        #- FirstTracker
+        #- SecondTracker
+        </rosparam>
+    </node>
+
+    <node name="optitrack_transform_publisher" pkg="ur5_vistac_common" type="publish_optitrack_transform.py" args="" output="screen" respawn="false" />
+
+
+    <!-- start digit sensors -->
+    <node name="digit_frames_publisher" pkg="ur5_vistac_common" type="publish_digit_frames.py" respawn="true" />
+
+    <!-- start rviz -->
+    <arg name="debug" default="false" />
+    <arg unless="$(arg debug)" name="launch_prefix" value="" />
+    <arg     if="$(arg debug)" name="launch_prefix" value="gdb --ex run --args" />
+    <arg name="config" default="" />
+    <arg unless="$(eval config=='')" name="command_args" value="-d $(arg config)" />
+    <arg     if="$(eval config=='')" name="command_args" value="-d $(find ur5_vistac_common)/config/traj.rviz"/>
+
+    <node name="$(anon rviz)" launch-prefix="$(arg launch_prefix)" pkg="rviz" type="rviz" respawn="false"
+        args="$(arg command_args)" output="screen">
+    </node>
+
+</launch>
