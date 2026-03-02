@@ -43,6 +43,7 @@ import numpy as np
 import time
 import os
 from cv_bridge import CvBridge
+from collections import deque, defaultdict
 
 # def init_digits():
 #     # Initialize the DIGIT device
@@ -181,6 +182,9 @@ def o3dpc_to_rospc(o3dpc, frame_id=None, stamp=None):
     return rospc
 
 def process_points(point_cloud_msg):
+    """
+    colour based points segmentation for red mug object
+    """
     # Convert PointCloud2 to XYZRGB format
     cloud = list(pc2.read_points(point_cloud_msg, field_names=["x", "y", "z", "rgb"], skip_nans=True))
 
@@ -232,6 +236,7 @@ def process_points(point_cloud_msg):
     ros_pc = o3dpc_to_rospc(pcd)
     ros_pc.header.frame_id = point_cloud_msg.header.frame_id
             
+    # np array, o3d point cloud, ros message
     return xyz_points, pcd, ros_pc
 
 def one_message(save_path):
@@ -287,71 +292,176 @@ def one_message(save_path):
         
 
 class KeypointsData():
-    def __init__(self, save_path=None):
+    def __init__(self, save_path=None,
+                 cam_only=False, 
+                 voxel_size=0.003,          # 5 mm voxels (tune)
+                 window_frames=60,          # ~1s depth camera at 60Hz (tune)
+                 min_fraction=0.8):         # must appear in >=60% of frames
+        self.cam_only = cam_only
         self.i = 0
                 
         rospy.init_node('color_segmentation_node', anonymous=True)
         self.publisher = rospy.Publisher("/d405/depth/color/points_processed", PointCloud2, queue_size=1)
+        self.publisher_avg = rospy.Publisher("/d405/depth/color/points_averaged", PointCloud2, queue_size=1)
         
         self.save_path = save_path
         
         self.bridge = CvBridge()
+        
+        # --- temporal voxel accumulator ---
+        self.voxel_size = float(voxel_size)
+        self.window_frames = int(window_frames)
+        self.min_fraction = float(min_fraction)
+
+        # Each entry in deque is (keys, xyz, counts_per_point) for that frame
+        # We store point-level contributions so we can subtract them when the frame leaves the window.
+        self._frame_queue = deque(maxlen=self.window_frames)
+
+        # Global accumulators over the sliding window
+        self._count = defaultdict(int)  # key -> int
+        self._sum = defaultdict(lambda: np.zeros(3, dtype=np.float64))  # key -> (3,)
 
     def callback(self, point_cloud_msg):
         # segment the points in XYZRGB format
         xyz_points, pcd, ros_pc = process_points(point_cloud_msg)
         
-        # save the point cloud as npy files
+        # --- voxel accumulator ---
+        vidx = self.voxel_indices(xyz_points, self.voxel_size)
+        keys = self.pack_voxel_keys(vidx)
+        
+        # add contributions for this frame
+        for k, p in zip(keys, xyz_points):
+            self._count[k] += 1
+            self._sum[k] += p.astype(np.float64)
+            
+        # push into sliding-window queue
+        self._frame_queue.append((keys, xyz_points))
+        
+        # If deque is full and an old frame was evicted, subtract it manually.
+        # deque(maxlen=...) discards silently, so we handle overflow ourselves:
+        while len(self._frame_queue) > self.window_frames:
+            old_keys, old_xyz = self._frame_queue.popleft()
+            for k, p in zip(old_keys, old_xyz):
+                self._count[k] -= 1
+                self._sum[k] -= p.astype(np.float64)
+                if self._count[k] <= 0:
+                    del self._count[k]
+                    del self._sum[k]
+
+        # wait until there is enough history before publishing averaged pc
+        # manual tune for required history length
+        if len(self._frame_queue) < max(3, int(0.7 * self.window_frames)):
+            # publish raw until it fills
+            self.publisher.publish(ros_pc)
+            return
+        
+        # --- build averaged pc from frequent voxels ---
+        # only keep voxels that appear in more than the min_fraction of recent frames
+        min_count = int(np.ceil(self.min_fraction * len(self._frame_queue)))
+        out_pts = []
+        for k, c in self._count.items():
+            if c >= min_count:
+                # calculate the average of all accumulated points
+                out_pts.append(self._sum[k] / float(c))
+        
+        if len(out_pts) == 0:
+            # fallback to original pc
+            print(f"[WARN] No voxel has been populated \
+                for more than {self.min_fraction*100}% over the window")
+            
+        out_pts = np.asarray(out_pts, dtype=np.float32)
+        
+        out_pcd = o3d.geometry.PointCloud()
+        out_pcd.points = o3d.utility.Vector3dVector(out_pts)
+        
+        # paint red for visuals
+        out_colors = np.tile(np.array([[1.0, 0.0, 0.0]], dtype=np.float32), (out_pts.shape[0], 1))
+        out_pcd.colors = o3d.utility.Vector3dVector(out_colors)
+
+        out_ros = o3dpc_to_rospc(out_pcd)
+        out_ros.header.frame_id = point_cloud_msg.header.frame_id
+        out_ros.header.stamp = point_cloud_msg.header.stamp
+        
+        # save the processed point cloud as npy files
         # random sampler to decide whether to save
-        if self.save_path is not None and np.random.random() > 0.99:
+        # 20 frames per second
+        if self.save_path is not None and np.random.random() > 20/60:
             start_t = time.time()
             
             # save the depth points (both numpy and o3d)
             depth_path = self.save_path / "in_hand_depth"
             np.save(depth_path / f"partial_depth_{self.i}.npy", xyz_points)
-            o3d.io.write_point_cloud(f"partial_depth_{self.i}.ply", pcd)
+            o3d.io.write_point_cloud(str(depth_path / f"partial_depth_{self.i}.ply"), pcd)
+            # save the averaged depth points
+            np.save(depth_path / f"partial_depth_{self.i}_averaged.npy", out_pts)
+            o3d.io.write_point_cloud(str(depth_path / f"partial_depth_{self.i}_averaged.ply"), out_pcd)
             
-            # save the digit frames
-            digit_path = self.save_path / "digits"
-            left_msg = None
-            right_msg = None
-            while left_msg == None or right_msg == None:
-                digit_msg = rospy.wait_for_message("/digit/image_raw", Image)
-                if "left" in digit_msg.header.frame_id:
-                    left_msg = digit_msg
-                elif "right" in digit_msg.header.frame_id:
-                    right_msg = digit_msg
-                else:
-                    print("wot")
+            if not self.cam_only:
+                # save the digit frames
+                digit_path = self.save_path / "digits"
+                left_msg = None
+                right_msg = None
+                while left_msg == None or right_msg == None:
+                    digit_msg = rospy.wait_for_message("/digit/image_raw", Image)
+                    if "left" in digit_msg.header.frame_id:
+                        left_msg = digit_msg
+                    elif "right" in digit_msg.header.frame_id:
+                        right_msg = digit_msg
+                    else:
+                        print("wot")
+                
+                lframe = self.bridge.imgmsg_to_cv2(left_msg)
+                rframe = self.bridge.imgmsg_to_cv2(right_msg)
+                
+                cv2.imwrite(str(digit_path / f"left_{self.i}.png"), lframe)
+                cv2.imwrite(str(digit_path / f"right_{self.i}.png"), rframe)
             
-            lframe = self.bridge.imgmsg_to_cv2(left_msg)
-            rframe = self.bridge.imgmsg_to_cv2(right_msg)
+                # save the mocap pose
+                pose_path = self.save_path / "pose"
+                #TODO: finish this
             
-            cv2.imwrite(str(digit_path / f"left_{self.i}.png"), lframe)
-            cv2.imwrite(str(digit_path / f"right_{self.i}.png"), rframe)
-            
-            # save the mocap pose
-            pose_path = self.save_path / "pose"
-            #TODO: finish this
+            self.i += 1
             
             # save the rgb image (compressed)
             rgb_path = self.save_path / "in_hand_rgb"
             
-            
-        
         self.publisher.publish(ros_pc)
+        print(f"Averaged {out_pts.shape[0]} points")
+        self.publisher_avg.publish(out_ros)
         
 
     def listener(self):
         rospy.Subscriber("/d405/depth/color/points", PointCloud2, self.callback)
         rospy.spin()
 
+    @staticmethod
+    def voxel_indices(xyz: np.ndarray, voxel_size: float) -> np.ndarray:
+        """
+        split a size N set of points into voxels
+        xyz: (N,3) float
+        returns: (N,3) int voxel coords
+        """
+        return np.floor(xyz / voxel_size).astype(np.int32)
+
+    @staticmethod
+    def pack_voxel_keys(vidx: np.ndarray) -> np.ndarray:
+        """
+        Pack int32 (N,3) voxel coords into int64 keys for dict usage.
+        Safe for reasonable ranges.
+        """
+        vx = vidx[:, 0].astype(np.int64)
+        vy = vidx[:, 1].astype(np.int64)
+        vz = vidx[:, 2].astype(np.int64)
+        # simple bijection-like packing (assumes coords not astronomically large)
+        return (vx << 42) ^ (vy << 21) ^ vz
+    
     
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--save', action='store_true', help='')
     parser.add_argument('--spin', action='store_true')
+    parser.add_argument('--cam-only', action='store_true', help='skip digit saving')
     args = parser.parse_args()
     
     if args.save:
@@ -380,7 +490,7 @@ if __name__ == '__main__':
         exp_dir = None
     
     if args.spin:
-        k = KeypointsData(save_path=exp_dir)
+        k = KeypointsData(save_path=exp_dir, cam_only=args.cam_only)
         k.listener()
     else:
         one_message(save_path=exp_dir)
