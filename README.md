@@ -4,13 +4,34 @@ ROS package for in-hand pivoting experiments with a UR5 robot arm. The package w
 ## Building
 
 ```bash
-git clone git@github.com:ericx1107/ur5-slip-pivoting.git slip_manipulation
+# clone to src folder in ros workspace
+git clone https://github.com/exsyu/ur5-slip-pivoting.git src/
 ```
 
-Many required packages are written with Python2 syntax, build with Python2.7:
+For Python3 components (especially related to OpenCV), build with the following:
+```bash
+# replace python3.6m with actual python version
+catkin build --cmake-args -DCMAKE_BUILD_TYPE=Release -DPYTHON_EXECUTABLE="$(which python)" -DPYTHON_INCLUDE_DIR=/usr/include/python3.6m -DPYTHON_LIBRARY=/usr/lib/x86_64-linux-gnu/libpython3.6m.so
+```
+But a lot of packages actually use pyhon2 syntax (e.g. robotiq 2f stuff), so actually build with:
 ```bash
 catkin_make
 ```
+
+For the robot specific roslaunches, use normal python2.
+
+For the digit related things, use python3 (Python 3.6.9 used).
+
+Best to do this in a virtual environment, for example, using venv:
+```bash
+# creat venv using Python 3.6.9
+python3 -m venv traj
+
+. ./traj/bin/activate
+
+pip install -r requirements.txt
+```
+
 
 We use slip in the gripper fingers to enable the rotation of a target box object, while using multiple data-modalities to track the state of the object. For details see [our paper](https://ieeexplore.ieee.org/abstract/document/10341505). 
 
@@ -35,4 +56,12 @@ The `config` directory contains some useful rviz presets.
 ### Zero FT 300 sensor
 ```
 rosservice call /robotiq_ft_sensor_acc "command_id: 8"
+
+# zero tactile sensors
+rosservice call /hub_0/send_bias_request
+```
+
+### run the simple trajectory data collection
+```
+roslaunch vistac_trajectory simple_trajectory.launch
 ```
